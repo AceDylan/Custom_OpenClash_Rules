@@ -6,3 +6,6 @@ DOMAIN-SUFFIX,maosu.vip
 
 # 影巢
 DOMAIN-SUFFIX,hdhive.com
+
+# AWS
+DOMAIN-SUFFIX,amazon.com
