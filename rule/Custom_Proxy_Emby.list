@@ -1,6 +1,8 @@
 # 爱壹帆
 DOMAIN-SUFFIX,iyf.tv
 DOMAIN-SUFFIX,pipecdn.vip
+DOMAIN-SUFFIX,hlive.io
+DOMAIN-REGEX,^s[0-9]+-[a-z][0-9]+\.
 
 # M78星云
 DOMAIN-SUFFIX,m78tv.com
@@ -8,6 +10,7 @@ DOMAIN-SUFFIX,m78tv.com
 # 欧乐影院
 DOMAIN-SUFFIX,olevod.com
 DOMAIN-SUFFIX,olemovienews.com
+DOMAIN-SUFFIX,olelive.com
 
 # 云海
 DOMAIN-SUFFIX,oceancloud.asia
