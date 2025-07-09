@@ -2,6 +2,7 @@
 DOMAIN-SUFFIX,m78star.cloud
 DOMAIN-SUFFIX,llgjc1.com
 DOMAIN-SUFFIX,okti.xyz
+DOMAIN-SUFFIX,okxyz.xyz
 DOMAIN-SUFFIX,maosu.vip
 
 # 影巢
@@ -9,3 +10,6 @@ DOMAIN-SUFFIX,hdhive.com
 
 # AWS
 DOMAIN-SUFFIX,amazon.com
+
+# 其他
+DOMAIN-SUFFIX,jianpiancloud.com
