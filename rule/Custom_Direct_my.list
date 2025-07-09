@@ -2,5 +2,6 @@
 DOMAIN-SUFFIX,204cloud.com
 IP-CIDR,129.204.227.118/32,no-resolve
 
-# 划水摸鱼网站
+# 网站
 DOMAIN-SUFFIX,huashuimoyu.com
+DOMAIN-SUFFIX,mujicv.com
