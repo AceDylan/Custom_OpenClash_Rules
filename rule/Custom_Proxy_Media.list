@@ -10,6 +10,8 @@ DOMAIN-SUFFIX,hdhive.com
 
 # AWS
 DOMAIN-SUFFIX,amazon.com
+DOMAIN-SUFFIX,amazonaws.com
 
 # 其他
 DOMAIN-SUFFIX,jianpiancloud.com
+DOMAIN-SUFFIX,loli.net
