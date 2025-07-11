@@ -56,27 +56,38 @@ user_states = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/start命令"""
+    user_name = update.effective_user.first_name
     await update.message.reply_text(
-        "欢迎使用OpenClash规则管理机器人！\n\n"
-        "请发送域名或IP地址，然后选择要添加到哪个规则文件中。\n\n"
-        "示例:\n"
-        "- 域名: example.com\n"
-        "- IP: 8.8.8.8"
+        f"🚀 *欢迎 {user_name} 使用 OpenClash 规则管理机器人！*\n\n"
+        "✨ *功能简介：*\n"
+        "此机器人可以帮您轻松添加域名或IP到不同的规则文件中。\n\n"
+        "📝 *使用方法：*\n"
+        "1️⃣ 直接发送域名或IP地址\n"
+        "2️⃣ 选择要添加到哪个规则文件\n"
+        "3️⃣ 机器人将自动完成添加和提交\n\n"
+        "📋 *示例格式：*\n"
+        "• 域名: example.com\n"
+        "• IP地址: 8.8.8.8\n\n"
+        "❓ 需要帮助请输入 /help 命令\n"
+        "🔄 开始添加规则请直接发送域名或IP",
+        parse_mode='Markdown'
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/help命令"""
     await update.message.reply_text(
-        "使用指南：\n"
-        "1. 直接发送域名或IP地址\n"
-        "2. 选择要添加到哪个规则文件\n"
-        "3. 机器人将自动添加规则并推送到GitHub仓库\n\n"
-        "支持的文件：\n"
-        "- AI代理规则 (Custom_Proxy_AI.list)\n"
-        "- 直连规则 (Custom_Direct_my.list)\n"
-        "- Emby代理规则 (Custom_Proxy_Emby.list)\n"
-        "- 媒体代理规则 (Custom_Proxy_Media.list)\n"
-        "- Google代理规则 (Custom_Proxy_Google.list)"
+        "📖 *使用指南*\n\n"
+        "📌 *基本操作：*\n"
+        "1️⃣ 直接发送域名或IP地址\n"
+        "2️⃣ 选择要添加到哪个规则文件\n"
+        "3️⃣ 机器人将自动添加规则并推送到GitHub仓库\n\n"
+        "📋 *支持的规则文件：*\n"
+        "• 🤖 AI代理规则 (Custom_Proxy_AI.list)\n"
+        "• 🏠 直连规则 (Custom_Direct_my.list)\n"
+        "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
+        "• 📺 媒体代理规则 (Custom_Proxy_Media.list)\n"
+        "• 🔍 Google代理规则 (Custom_Proxy_Google.list)",
+        parse_mode='Markdown'
     )
 
 def is_valid_domain(domain):
@@ -106,7 +117,7 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     elif is_valid_ip(user_input):
         input_type = "ip"
     else:
-        await update.message.reply_text("输入格式不正确，请输入有效的域名或IP地址。")
+        await update.message.reply_text("❌ 输入格式不正确，请输入有效的域名或IP地址。")
         return
     
     # 保存用户输入和类型
@@ -117,16 +128,16 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     # 创建文件选择菜单
     keyboard = [
-        [InlineKeyboardButton("AI代理规则", callback_data="file:ai")],
-        [InlineKeyboardButton("直连规则", callback_data="file:direct")],
-        [InlineKeyboardButton("Emby代理规则", callback_data="file:emby")],
-        [InlineKeyboardButton("媒体代理规则", callback_data="file:media")],
-        [InlineKeyboardButton("Google代理规则", callback_data="file:google")]
+        [InlineKeyboardButton("🤖 AI代理规则", callback_data="file:ai")],
+        [InlineKeyboardButton("🏠 直连规则", callback_data="file:direct")],
+        [InlineKeyboardButton("🎬 Emby代理规则", callback_data="file:emby")],
+        [InlineKeyboardButton("📺 媒体代理规则", callback_data="file:media")],
+        [InlineKeyboardButton("🔍 Google代理规则", callback_data="file:google")]
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text("请选择要添加到哪个规则文件:", reply_markup=reply_markup)
+    await update.message.reply_text("🔽 请选择要添加到哪个规则文件:", reply_markup=reply_markup)
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理按钮回调"""
@@ -135,7 +146,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     user_id = update.effective_user.id
     if user_id not in user_states:
-        await query.edit_message_text("会话已过期，请重新发送域名或IP地址。")
+        await query.edit_message_text("⏱️ 会话已过期，请重新发送域名或IP地址。")
         return
     
     user_data = user_states[user_id]
@@ -147,7 +158,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             file_path = RULE_FILES[file_key]
             await add_rule_and_commit(query, user_data, file_path)
         else:
-            await query.edit_message_text("无效的文件选择，请重新操作。")
+            await query.edit_message_text("❌ 无效的文件选择，请重新操作。")
 
 async def add_rule_and_commit(query, user_data, file_path):
     """添加规则到文件并提交到Git仓库"""
@@ -166,7 +177,7 @@ async def add_rule_and_commit(query, user_data, file_path):
         
         # 如果目录不存在或不是有效的Git仓库，则克隆
         if not os.path.exists(REPO_PATH) or not is_git_repo:
-            await query.edit_message_text("正在克隆仓库...")
+            await query.edit_message_text("⏳ 正在克隆仓库...")
             # 如果目录已存在但不是Git仓库，先删除
             if os.path.exists(REPO_PATH) and not is_git_repo:
                 import shutil
@@ -175,7 +186,7 @@ async def add_rule_and_commit(query, user_data, file_path):
             os.makedirs(os.path.dirname(REPO_PATH), exist_ok=True)
             repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
         else:
-            await query.edit_message_text("正在更新仓库...")
+            await query.edit_message_text("🔄 正在更新仓库...")
             repo = git.Repo(REPO_PATH)
             origin = repo.remotes.origin
             origin.pull()
@@ -203,7 +214,7 @@ async def add_rule_and_commit(query, user_data, file_path):
                     rule_exists = True
         
         if rule_exists:
-            await query.edit_message_text(f"规则 '{input_value}' 已存在于文件中，无需添加。")
+            await query.edit_message_text(f"ℹ️ 规则 '{input_value}' 已存在于文件中，无需添加。")
             return
         
         # 追加规则到文件
@@ -217,13 +228,13 @@ async def add_rule_and_commit(query, user_data, file_path):
         origin.push()
         
         await query.edit_message_text(
-            f"已成功将 '{input_value}' 添加到 {os.path.basename(file_path)} 并推送到仓库。"
+            f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。"
         )
         
     except Exception as e:
         error_details = traceback.format_exc()
         logger.error(f"发生错误: {str(e)}\n{error_details}")
-        await query.edit_message_text(f"操作失败: {str(e)}\n详细错误请查看日志。")
+        await query.edit_message_text(f"❌ 操作失败: {str(e)}\n详细错误请查看日志。")
 
 async def run_bot():
     """异步运行机器人"""
@@ -301,7 +312,7 @@ git config --global user.name "AceDylan"
 docker-compose up -d --build
 
 echo "-------------------------------------"
-echo "OpenClash规则管理机器人已启动"
-echo "请记得修改bot.py文件中的GitHub用户名"
-echo "您可以在Telegram上搜索您的机器人并开始使用"
+echo "✅ OpenClash规则管理机器人已启动"
+echo "📝 请记得修改bot.py文件中的GitHub用户名"
+echo "🤖 您可以在Telegram上搜索您的机器人并开始使用"
 echo "-------------------------------------" 
