@@ -23,3 +23,5 @@ DOMAIN-SUFFIX,yandex.ru
 DOMAIN-SUFFIX,ya.ru
 DOMAIN-SUFFIX,yandex.com
 DOMAIN-SUFFIX,yastatic.net
+# 添加域名 yesicon.app
+DOMAIN-SUFFIX,yesicon.app
