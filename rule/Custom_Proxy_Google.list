@@ -1,3 +1,6 @@
 # GooglePlay 相关
 DOMAIN-SUFFIX,googleapis.cn
 DOMAIN-SUFFIX,xn--ngstr-lra8j.com
+
+# 添加域名 cloudflare.com
+DOMAIN-SUFFIX,cloudflare.com
