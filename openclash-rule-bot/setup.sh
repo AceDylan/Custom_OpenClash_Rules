@@ -8,8 +8,12 @@ opkg install git-http docker docker-compose coreutils-nohup
 mkdir -p /root/openclash-bot
 cd /root/openclash-bot
 
+# 读取令牌值
+TELEGRAM_TOKEN=$(cat /root/TELEGRAM_TOKEN.txt)
+GITHUB_TOKEN=$(cat /root/GITHUB_TOKEN.txt)
+
 # 下载配置文件
-cat > bot.py << 'EOF'
+cat > bot.py << EOF
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -29,8 +33,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 配置信息
-TELEGRAM_TOKEN = ""
-GITHUB_TOKEN = ""
+TELEGRAM_TOKEN = "${TELEGRAM_TOKEN}"
+GITHUB_TOKEN = "${GITHUB_TOKEN}"
 REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/AceDylan/Custom_OpenClash_Rules.git"
 REPO_PATH = "/app/repo"
 
