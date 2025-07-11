@@ -21,6 +21,7 @@ import os
 import re
 import logging
 import asyncio
+import traceback
 import nest_asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
@@ -157,6 +158,8 @@ async def add_rule_and_commit(query, user_data, file_path):
         # 确保仓库存在并且是最新的
         if not os.path.exists(REPO_PATH):
             await query.edit_message_text("正在克隆仓库...")
+            # 确保目录存在
+            os.makedirs(REPO_PATH, exist_ok=True)
             repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
         else:
             await query.edit_message_text("正在更新仓库...")
@@ -205,8 +208,9 @@ async def add_rule_and_commit(query, user_data, file_path):
         )
         
     except Exception as e:
-        logger.error(f"发生错误: {str(e)}")
-        await query.edit_message_text(f"操作失败: {str(e)}")
+        error_details = traceback.format_exc()
+        logger.error(f"发生错误: {str(e)}\n{error_details}")
+        await query.edit_message_text(f"操作失败: {str(e)}\n详细错误请查看日志。")
 
 async def run_bot():
     """异步运行机器人"""
@@ -253,7 +257,9 @@ RUN apt-get update && \
     apt-get install -y git dbus policykit-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    mkdir -p /app/repo && \
+    chmod -R 777 /app/repo
 
 CMD ["python", "bot.py"] 
 EOF
