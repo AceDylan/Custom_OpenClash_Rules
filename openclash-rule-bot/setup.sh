@@ -264,8 +264,20 @@ async def add_rule_and_commit(query, user_data, file_path):
         origin = repo.remotes.origin
         origin.push()
         
+        # 通知用户正在等待GitHub更新，并设置60秒倒计时
+        await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n⏳ 正在等待GitHub同步更新 (60秒)...")
+        
+        # 每10秒更新一次倒计时消息
+        wait_time = 60
+        while wait_time > 0:
+            await asyncio.sleep(10)
+            wait_time -= 10
+            if wait_time > 0:
+                await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n⏳ 正在等待GitHub同步更新 ({wait_time}秒)...")
+        
         # 更新OpenClash规则
         update_message = ""
+        await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n🔄 正在更新OpenClash规则...")
         try:
             if file_path in OPENCLASH_RULE_MAPPING:
                 rule_name = OPENCLASH_RULE_MAPPING[file_path]
@@ -273,14 +285,14 @@ async def add_rule_and_commit(query, user_data, file_path):
                 headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
                 response = requests.put(url, headers=headers)
                 if response.status_code == 204:
-                    update_message = f"\n\n已自动刷新OpenClash规则: {rule_name}"
+                    update_message = f"\n\n✅ 已成功刷新OpenClash规则: {rule_name}"
                 else:
-                    update_message = f"\n\n尝试刷新规则失败，状态码: {response.status_code}"
+                    update_message = f"\n\n❌ 尝试刷新规则失败，状态码: {response.status_code}"
             else:
-                update_message = "\n\n无法确定对应的OpenClash规则，未进行刷新"
+                update_message = "\n\n⚠️ 无法确定对应的OpenClash规则，未进行刷新"
         except Exception as e:
             logger.error(f"刷新OpenClash规则失败: {str(e)}")
-            update_message = f"\n\n刷新规则时发生错误: {str(e)}"
+            update_message = f"\n\n❌ 刷新规则时发生错误: {str(e)}"
         
         await query.edit_message_text(
             f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。{update_message}"
