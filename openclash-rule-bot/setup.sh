@@ -16,6 +16,7 @@ cat > bot.py << 'EOF'
 import os
 import re
 import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import git
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 # 配置信息
 TELEGRAM_TOKEN = ""
 GITHUB_TOKEN = ""
-REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/YOUR_USERNAME/Custom_OpenClash_Rules.git"
+REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/AceDylan/Custom_OpenClash_Rules.git"
 REPO_PATH = "/app/repo"
 
 # 规则文件列表
@@ -200,8 +201,8 @@ async def add_rule_and_commit(query, user_data, file_path):
         logger.error(f"发生错误: {str(e)}")
         await query.edit_message_text(f"操作失败: {str(e)}")
 
-def main() -> None:
-    """启动机器人"""
+async def run_bot():
+    """异步运行机器人"""
     # 创建应用并注册处理程序
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
@@ -212,15 +213,25 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_callback))
     
     # 启动机器人
-    application.run_polling()
+    await application.initialize()
+    await application.start()
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+def main() -> None:
+    """启动机器人"""
+    # 设置并启动事件循环
+    asyncio.run(run_bot())
 
 if __name__ == '__main__':
-    main()
+    main() 
 EOF
 
 cat > requirements.txt << 'EOF'
 python-telegram-bot>=20.0
 gitpython>=3.1.30
+sniffio>=1.3.0
+anyio>=3.7.1
+httpx>=0.24.1 
 EOF
 
 cat > Dockerfile << 'EOF'
@@ -232,12 +243,12 @@ COPY bot.py /app/
 COPY requirements.txt /app/
 
 RUN apt-get update && \
-    apt-get install -y git && \
+    apt-get install -y git dbus policykit-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "bot.py"]
+CMD ["python", "bot.py"] 
 EOF
 
 cat > docker-compose.yml << 'EOF'
@@ -258,8 +269,8 @@ EOF
 mkdir -p repo
 
 # 配置git用户信息
-git config --global user.email "bot@example.com"
-git config --global user.name "OpenClash Rule Bot"
+git config --global user.email "1041151706@qq.com"
+git config --global user.name "AceDylan"
 
 # 启动Docker容器
 docker-compose up -d --build

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # 配置信息
 TELEGRAM_TOKEN = ""
 GITHUB_TOKEN = ""
-REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/YOUR_USERNAME/Custom_OpenClash_Rules.git"
+REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/AceDylan/Custom_OpenClash_Rules.git"
 REPO_PATH = "/app/repo"
 
 # 规则文件列表
