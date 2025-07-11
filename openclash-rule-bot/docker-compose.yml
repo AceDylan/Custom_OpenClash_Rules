@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  telegram-bot:
+    build: .
+    container_name: openclash-rule-bot
+    restart: always
+    volumes:
+      - ./repo:/app/repo
+    environment:
+      - TZ=Asia/Shanghai 
