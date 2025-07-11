@@ -155,11 +155,24 @@ async def add_rule_and_commit(query, user_data, file_path):
     input_type = user_data["type"]
     
     try:
-        # 确保仓库存在并且是最新的
-        if not os.path.exists(REPO_PATH):
+        # 检查是否为有效的Git仓库
+        is_git_repo = False
+        if os.path.exists(REPO_PATH):
+            try:
+                git.Repo(REPO_PATH)
+                is_git_repo = True
+            except git.exc.InvalidGitRepositoryError:
+                is_git_repo = False
+        
+        # 如果目录不存在或不是有效的Git仓库，则克隆
+        if not os.path.exists(REPO_PATH) or not is_git_repo:
             await query.edit_message_text("正在克隆仓库...")
+            # 如果目录已存在但不是Git仓库，先删除
+            if os.path.exists(REPO_PATH) and not is_git_repo:
+                import shutil
+                shutil.rmtree(REPO_PATH)
             # 确保目录存在
-            os.makedirs(REPO_PATH, exist_ok=True)
+            os.makedirs(os.path.dirname(REPO_PATH), exist_ok=True)
             repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
         else:
             await query.edit_message_text("正在更新仓库...")
