@@ -4,6 +4,7 @@
 import os
 import re
 import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import git
@@ -188,8 +189,8 @@ async def add_rule_and_commit(query, user_data, file_path):
         logger.error(f"发生错误: {str(e)}")
         await query.edit_message_text(f"操作失败: {str(e)}")
 
-def main() -> None:
-    """启动机器人"""
+async def run_bot():
+    """异步运行机器人"""
     # 创建应用并注册处理程序
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
@@ -200,7 +201,14 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_callback))
     
     # 启动机器人
-    application.run_polling()
+    await application.initialize()
+    await application.start()
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+def main() -> None:
+    """启动机器人"""
+    # 设置并启动事件循环
+    asyncio.run(run_bot())
 
 if __name__ == '__main__':
     main() 
