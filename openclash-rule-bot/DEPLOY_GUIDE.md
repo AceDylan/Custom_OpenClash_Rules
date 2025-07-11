@@ -15,7 +15,7 @@
 2. 下载setup.sh脚本：
 ```bash
 cd /root
-wget https://raw.githubusercontent.com/YOUR_USERNAME/Custom_OpenClash_Rules/main/openclash-rule-bot/setup.sh
+wget https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/openclash-rule-bot/setup.sh
 # 如果wget命令不可用，可使用curl：
 # curl -o setup.sh https://raw.githubusercontent.com/YOUR_USERNAME/Custom_OpenClash_Rules/main/openclash-rule-bot/setup.sh
 ```
@@ -30,14 +30,6 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-5. 修改GitHub用户名：
-```bash
-vi /root/openclash-bot/bot.py
-```
-找到以下行并修改YOUR_USERNAME为你的GitHub用户名：
-```python
-REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/YOUR_USERNAME/Custom_OpenClash_Rules.git"
-```
 
 6. 重启容器使更改生效：
 ```bash
