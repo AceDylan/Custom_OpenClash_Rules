@@ -25,3 +25,6 @@ DOMAIN-SUFFIX,yandex.com
 DOMAIN-SUFFIX,yastatic.net
 # 添加域名 yesicon.app
 DOMAIN-SUFFIX,yesicon.app
+
+# 添加域名 strongme.app
+DOMAIN-SUFFIX,strongme.app
