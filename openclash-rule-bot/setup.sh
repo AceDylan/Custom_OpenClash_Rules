@@ -256,17 +256,16 @@ CMD ["python", "bot.py"]
 EOF
 
 cat > docker-compose.yml << 'EOF'
-version: '3'
-
 services:
   telegram-bot:
     build: .
     container_name: openclash-rule-bot
     restart: always
+    network_mode: "host"
     volumes:
       - ./repo:/app/repo
     environment:
-      - TZ=Asia/Shanghai
+      - TZ=Asia/Shanghai 
 EOF
 
 # 创建repo目录

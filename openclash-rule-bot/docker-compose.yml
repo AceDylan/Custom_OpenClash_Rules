@@ -3,6 +3,7 @@ services:
     build: .
     container_name: openclash-rule-bot
     restart: always
+    network_mode: "host"
     volumes:
       - ./repo:/app/repo
     environment:
