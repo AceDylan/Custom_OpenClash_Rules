@@ -170,7 +170,7 @@ async def add_rule_and_commit(query, user_data, file_path):
         is_git_repo = False
         if os.path.exists(REPO_PATH):
             try:
-                git.Repo(REPO_PATH)
+                repo = git.Repo(REPO_PATH)
                 is_git_repo = True
             except git.exc.InvalidGitRepositoryError:
                 is_git_repo = False
@@ -178,13 +178,35 @@ async def add_rule_and_commit(query, user_data, file_path):
         # 如果目录不存在或不是有效的Git仓库，则克隆
         if not os.path.exists(REPO_PATH) or not is_git_repo:
             await query.edit_message_text("⏳ 正在克隆仓库...")
-            # 如果目录已存在但不是Git仓库，先删除
+            
+            # 对于挂载的目录，不尝试删除，而是尝试直接在其中初始化Git仓库
             if os.path.exists(REPO_PATH) and not is_git_repo:
-                import shutil
-                shutil.rmtree(REPO_PATH)
-            # 确保目录存在
-            os.makedirs(os.path.dirname(REPO_PATH), exist_ok=True)
-            repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
+                try:
+                    # 清空目录内容，但保留目录本身
+                    for item in os.listdir(REPO_PATH):
+                        item_path = os.path.join(REPO_PATH, item)
+                        if os.path.isfile(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            import shutil
+                            shutil.rmtree(item_path)
+                    
+                    # 在现有目录中克隆
+                    repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
+                except Exception as e:
+                    logger.error(f"清空目录失败: {str(e)}")
+                    # 如果清空失败，尝试直接初始化Git仓库
+                    repo = git.Repo.init(REPO_PATH)
+                    origin = repo.create_remote('origin', REPO_URL)
+                    origin.fetch()
+                    repo.create_head('main', origin.refs.main)
+                    repo.heads.main.set_tracking_branch(origin.refs.main)
+                    repo.heads.main.checkout()
+                    origin.pull()
+            else:
+                # 确保父目录存在
+                os.makedirs(os.path.dirname(REPO_PATH), exist_ok=True)
+                repo = git.Repo.clone_from(REPO_URL, REPO_PATH)
         else:
             await query.edit_message_text("🔄 正在更新仓库...")
             repo = git.Repo(REPO_PATH)
