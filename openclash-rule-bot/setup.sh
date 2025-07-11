@@ -272,7 +272,7 @@ async def add_rule_and_commit(query, user_data, file_path):
                 url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
                 headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
                 response = requests.put(url, headers=headers)
-                if response.status_code == 200:
+                if response.status_code == 204:
                     update_message = f"\n\n已自动刷新OpenClash规则: {rule_name}"
                 else:
                     update_message = f"\n\n尝试刷新规则失败，状态码: {response.status_code}"
