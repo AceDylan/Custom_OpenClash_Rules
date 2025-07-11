@@ -15,9 +15,9 @@
 2. 下载setup.sh脚本：
 ```bash
 cd /root
-wget https://raw.githubusercontent.com/YOUR_USERNAME/openclash-rule-bot/main/setup.sh
+wget https://raw.githubusercontent.com/YOUR_USERNAME/Custom_OpenClash_Rules/main/openclash-rule-bot/setup.sh
 # 如果wget命令不可用，可使用curl：
-# curl -o setup.sh https://raw.githubusercontent.com/YOUR_USERNAME/openclash-rule-bot/main/setup.sh
+# curl -o setup.sh https://raw.githubusercontent.com/YOUR_USERNAME/Custom_OpenClash_Rules/main/openclash-rule-bot/setup.sh
 ```
 
 3. 赋予脚本执行权限：
