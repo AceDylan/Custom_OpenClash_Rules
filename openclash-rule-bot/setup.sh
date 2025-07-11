@@ -219,9 +219,8 @@ async def run_bot():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
     application.add_handler(CallbackQueryHandler(handle_callback))
     
-    # 启动机器人
+    # 启动机器人 - 移除了多余的start()调用
     await application.initialize()
-    await application.start()
     await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 def main() -> None:
