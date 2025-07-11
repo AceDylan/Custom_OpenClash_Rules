@@ -11,6 +11,11 @@
 ### 方法一：使用一键安装脚本（推荐）
 
 1. 登录到OpenWrt shell
+```bash
+touch TELEGRAM_TOKEN.txt
+touch GITHUB_TOKEN.txt
+```
+然后把token分别填入
 
 2. 下载setup.sh脚本：
 ```bash
@@ -28,41 +33,6 @@ chmod +x setup.sh
 4. 运行安装脚本：
 ```bash
 ./setup.sh
-```
-
-### 方法二：手动部署
-
-1. 登录到OpenWrt shell
-
-2. 安装必要软件包：
-```bash
-opkg update
-opkg install git-http docker docker-compose
-```
-
-3. 创建项目目录：
-```bash
-mkdir -p /root/openclash-bot
-cd /root/openclash-bot
-```
-
-4. 创建所需文件：
-
-- bot.py: 机器人主程序
-- requirements.txt: Python依赖
-- Dockerfile: 容器构建文件
-- docker-compose.yml: 容器编排文件
-
-5. 修改bot.py中的GitHub用户名
-
-6. 创建仓库目录：
-```bash
-mkdir -p repo
-```
-
-7. 构建并启动容器：
-```bash
-docker-compose up -d --build
 ```
 
 ## 使用方法
