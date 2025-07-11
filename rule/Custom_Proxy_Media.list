@@ -28,3 +28,6 @@ DOMAIN-SUFFIX,yesicon.app
 
 # 添加域名 strongme.app
 DOMAIN-SUFFIX,strongme.app
+
+# 添加域名 appinn.me
+DOMAIN-SUFFIX,appinn.me
