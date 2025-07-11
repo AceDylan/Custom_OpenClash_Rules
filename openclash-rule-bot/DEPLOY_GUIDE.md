@@ -30,13 +30,6 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-
-6. 重启容器使更改生效：
-```bash
-cd /root/openclash-bot
-docker-compose restart
-```
-
 ### 方法二：手动部署
 
 1. 登录到OpenWrt shell
