@@ -23,3 +23,17 @@ DOMAIN-SUFFIX,yandex.ru
 DOMAIN-SUFFIX,ya.ru
 DOMAIN-SUFFIX,yandex.com
 DOMAIN-SUFFIX,yastatic.net
+# 添加域名 yesicon.app
+DOMAIN-SUFFIX,yesicon.app
+
+# 添加域名 strongme.app
+DOMAIN-SUFFIX,strongme.app
+
+# 添加域名 appinn.me
+DOMAIN-SUFFIX,appinn.me
+
+# 添加域名 appinn.net
+DOMAIN-SUFFIX,appinn.net
+
+# 添加域名 alphatvapp.top
+DOMAIN-SUFFIX,alphatvapp.top
