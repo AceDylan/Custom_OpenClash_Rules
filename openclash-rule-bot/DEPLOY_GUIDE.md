@@ -14,8 +14,9 @@
 ```bash
 touch TELEGRAM_TOKEN.txt
 touch GITHUB_TOKEN.txt
+touch OPENCLASH_API_SECRET.txt
 ```
-然后把token分别填入
+然后把token分别填入(电报、github、openclash密钥--监控面板可获取)
 
 2. 下载setup.sh脚本：
 ```bash

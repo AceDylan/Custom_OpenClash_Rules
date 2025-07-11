@@ -11,6 +11,9 @@ cd /root/openclash-bot
 # 读取令牌值
 TELEGRAM_TOKEN=$(cat /root/TELEGRAM_TOKEN.txt)
 GITHUB_TOKEN=$(cat /root/GITHUB_TOKEN.txt)
+# OpenClash API 配置
+OPENCLASH_API_URL="http://192.168.6.1:9090"
+OPENCLASH_API_SECRET=$(cat /root/OPENCLASH_API_SECRET.txt)
 
 # 下载配置文件
 cat > bot.py << EOF
@@ -23,6 +26,7 @@ import logging
 import asyncio
 import traceback
 import nest_asyncio
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import git
@@ -41,6 +45,8 @@ TELEGRAM_TOKEN = "${TELEGRAM_TOKEN}"
 GITHUB_TOKEN = "${GITHUB_TOKEN}"
 REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/AceDylan/Custom_OpenClash_Rules.git"
 REPO_PATH = "/app/repo"
+OPENCLASH_API_URL = "${OPENCLASH_API_URL}"
+OPENCLASH_API_SECRET = "${OPENCLASH_API_SECRET}"
 
 # 规则文件列表
 RULE_FILES = {
@@ -49,6 +55,15 @@ RULE_FILES = {
     "emby": "rule/Custom_Proxy_Emby.list",
     "media": "rule/Custom_Proxy_Media.list",
     "google": "rule/Custom_Proxy_Google.list"
+}
+
+# 规则文件与OpenClash规则名称映射
+OPENCLASH_RULE_MAPPING = {
+    "rule/Custom_Proxy_AI.list": "Custom_Proxy_AI",
+    "rule/Custom_Direct_my.list": "Custom_Direct_my",
+    "rule/Custom_Proxy_Emby.list": "Custom_Proxy_Emby",
+    "rule/Custom_Proxy_Media.list": "Custom_Proxy_Media",
+    "rule/Custom_Proxy_Google.list": "Custom_Proxy_Google"
 }
 
 # 用户状态存储
@@ -249,8 +264,26 @@ async def add_rule_and_commit(query, user_data, file_path):
         origin = repo.remotes.origin
         origin.push()
         
+        # 更新OpenClash规则
+        update_message = ""
+        try:
+            if file_path in OPENCLASH_RULE_MAPPING:
+                rule_name = OPENCLASH_RULE_MAPPING[file_path]
+                url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
+                headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+                response = requests.put(url, headers=headers)
+                if response.status_code == 200:
+                    update_message = f"\n\n已自动刷新OpenClash规则: {rule_name}"
+                else:
+                    update_message = f"\n\n尝试刷新规则失败，状态码: {response.status_code}"
+            else:
+                update_message = "\n\n无法确定对应的OpenClash规则，未进行刷新"
+        except Exception as e:
+            logger.error(f"刷新OpenClash规则失败: {str(e)}")
+            update_message = f"\n\n刷新规则时发生错误: {str(e)}"
+        
         await query.edit_message_text(
-            f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。"
+            f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。{update_message}"
         )
         
     except Exception as e:
@@ -289,6 +322,7 @@ sniffio>=1.3.0
 anyio>=3.7.1
 httpx>=0.24.1
 nest-asyncio>=1.5.6
+requests>=2.28.1
 EOF
 
 cat > Dockerfile << 'EOF'
