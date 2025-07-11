@@ -21,9 +21,12 @@ import os
 import re
 import logging
 import asyncio
+import nest_asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import git
+
+nest_asyncio.apply()
 
 # 配置日志
 logging.basicConfig(
@@ -235,7 +238,8 @@ python-telegram-bot>=20.0
 gitpython>=3.1.30
 sniffio>=1.3.0
 anyio>=3.7.1
-httpx>=0.24.1 
+httpx>=0.24.1
+nest-asyncio>=1.5.6
 EOF
 
 cat > Dockerfile << 'EOF'
