@@ -31,3 +31,6 @@ DOMAIN-SUFFIX,strongme.app
 
 # 添加域名 appinn.me
 DOMAIN-SUFFIX,appinn.me
+
+# 添加域名 appinn.net
+DOMAIN-SUFFIX,appinn.net
