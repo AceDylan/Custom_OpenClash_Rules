@@ -55,3 +55,6 @@ DOMAIN-SUFFIX,seedhub.cc
 
 # 添加域名 salesmartly.com
 DOMAIN-SUFFIX,salesmartly.com
+
+# 添加域名 remove.bg
+DOMAIN-SUFFIX,remove.bg
