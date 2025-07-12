@@ -61,3 +61,6 @@ DOMAIN-SUFFIX,remove.bg
 
 # 添加域名 selenium.dev
 DOMAIN-SUFFIX,selenium.dev
+
+# 添加域名 hdhive.online
+DOMAIN-SUFFIX,hdhive.online
