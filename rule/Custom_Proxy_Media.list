@@ -58,3 +58,6 @@ DOMAIN-SUFFIX,salesmartly.com
 
 # 添加域名 remove.bg
 DOMAIN-SUFFIX,remove.bg
+
+# 添加域名 selenium.dev
+DOMAIN-SUFFIX,selenium.dev
