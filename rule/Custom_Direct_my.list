@@ -8,3 +8,6 @@ DOMAIN-SUFFIX,mujicv.com
 
 # 添加域名 nvidia.com
 DOMAIN-SUFFIX,nvidia.com
+
+# 添加域名 acedylan.us
+DOMAIN-SUFFIX,acedylan.us
