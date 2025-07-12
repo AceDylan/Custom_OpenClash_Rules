@@ -5,3 +5,6 @@ IP-CIDR,129.204.227.118/32,no-resolve
 # 网站
 DOMAIN-SUFFIX,huashuimoyu.com
 DOMAIN-SUFFIX,mujicv.com
+
+# 添加域名 nvidia.com
+DOMAIN-SUFFIX,nvidia.com
