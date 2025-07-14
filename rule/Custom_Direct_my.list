@@ -11,3 +11,6 @@ DOMAIN-SUFFIX,nvidia.com
 
 # 添加域名 acedylan.us
 DOMAIN-SUFFIX,acedylan.us
+
+# 添加域名 vban.xyz
+DOMAIN-SUFFIX,vban.xyz
