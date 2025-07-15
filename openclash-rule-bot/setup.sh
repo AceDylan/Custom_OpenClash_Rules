@@ -121,23 +121,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         
     user_name = update.effective_user.first_name
 
-    # 创建功能按钮
+    # 创建现代化功能按钮
     keyboard = [
-        [InlineKeyboardButton("➕ 添加规则", callback_data="action:add")],
-        [InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")],
-        [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
-        [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
-        [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
+        [
+            InlineKeyboardButton("➕ 添加规则", callback_data="action:add"),
+            InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")
+        ],
+        [
+            InlineKeyboardButton("❌ 删除规则", callback_data="action:delete"),
+            InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")
+        ],
+        [
+            InlineKeyboardButton("🔍 搜索规则", callback_data="action:search"),
+            InlineKeyboardButton("🔄 更新全部", callback_data="action:refresh_all")
+        ],
         [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
         f"🚀 *欢迎 {user_name} 使用 OpenClash 规则管理机器人！*\n\n"
-        "✨ *功能简介：*\n"
-        "此机器人可以帮您管理OpenClash规则，支持添加、查看、删除和移动规则。\n\n"
-        "请选择您要执行的操作：\n"
-        "或者使用 /help 查看详细使用说明",
+        "此机器人可以帮您管理OpenClash规则，支持添加、查看、删除、移动和搜索规则。\n\n"
+        "请选择您要执行的操作：",
         parse_mode='Markdown',
         reply_markup=reply_markup
     )
@@ -196,23 +201,46 @@ def is_valid_ip(ip):
             return False
     return True
 
-async def wait_for_github_sync(query, message_template):
-    """等待GitHub同步更新的倒计时函数"""
-    # 通知用户正在等待GitHub更新，并设置60秒倒计时
-    await query.edit_message_text(message_template.format(wait_time=60))
+async def check_github_sync_status(repo, commit_hash):
+    """检查GitHub同步状态的函数"""
+    try:
+        # 获取最新的远程引用
+        origin = repo.remotes.origin
+        origin.fetch()
+        
+        # 检查提交是否已存在于远程仓库
+        for ref in origin.refs:
+            if ref.name == 'origin/main':
+                # 如果提交已存在于远程仓库，返回True
+                if commit_hash in [c.hexsha for c in repo.iter_commits(ref, max_count=5)]:
+                    return True
+        return False
+    except Exception as e:
+        logger.error(f"检查GitHub同步状态时发生错误: {str(e)}")
+        return False
 
-    # 每10秒更新一次倒计时消息
-    wait_time = 60
-    while wait_time > 0:
-        await asyncio.sleep(10)
-        wait_time -= 10
-        if wait_time > 0:
-            await query.edit_message_text(message_template.format(wait_time=wait_time))
-
-    return
+async def wait_for_github_sync(query, message_template, repo, commit_hash):
+    """使用轮询方式等待GitHub同步的函数"""
+    max_attempts = 12  # 最大尝试次数
+    wait_time = 5  # 每次等待5秒
+    
+    for attempt in range(max_attempts):
+        # 更新等待消息
+        remaining = (max_attempts - attempt) * wait_time
+        await query.edit_message_text(message_template.format(wait_time=remaining))
+        
+        # 检查同步状态
+        if await check_github_sync_status(repo, commit_hash):
+            return True
+        
+        # 等待一段时间后再次检查
+        await asyncio.sleep(wait_time)
+    
+    # 达到最大尝试次数后，假设同步已完成
+    return False
 
 async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """处理用户输入的域名或IP地址"""
+    """处理用户输入的文本"""
     # 检查权限
     if not await check_permission(update):
         await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
@@ -220,6 +248,16 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
     user_input = update.message.text.strip()
     user_id = update.effective_user.id
+    
+    # 处理搜索输入
+    if user_id in user_states and user_states[user_id].get("action") == "search_waiting":
+        await handle_search_input(update, context, user_input)
+        return
+    
+    # 处理添加规则输入
+    if user_id in user_states and user_states[user_id].get("action") == "add_waiting_input":
+        await add_rule_and_commit(update, context, user_input)
+        return
 
     # 验证输入是域名还是IP
     if is_valid_domain(user_input):
@@ -577,13 +615,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 reply_markup=reply_markup
             )
             return
+        elif action == "search":
+            user_states[user_id] = {"action": "search_waiting"}
+            await query.edit_message_text("🔍 请输入要搜索的域名或IP地址关键词：")
+            return
 
     # 添加规则
     elif callback_data.startswith("add:file:"):
         file_key = callback_data.split(":")[2]
         if file_key in RULE_FILES:
             file_path = RULE_FILES[file_key]
-            await add_rule_and_commit(query, user_states[user_id], file_path)
+            await add_rule_and_commit(update, context, file_path)
         else:
             await query.edit_message_text("❌ 无效的文件选择，请重新操作。")
 
@@ -923,7 +965,7 @@ async def delete_rule_and_commit(query, user_id, file_path, rule_index):
 
         # 等待GitHub同步
         message_template = f"✅ 已从 {os.path.basename(file_path)} 中删除规则: {rule_value}\n\n⏳ 正在等待GitHub同步更新 ({{wait_time}}秒)..."
-        await wait_for_github_sync(query, message_template)
+        await wait_for_github_sync(query, message_template, repo, repo.head.commit.hexsha)
 
         # 更新OpenClash规则
         await query.edit_message_text(f"✅ 已从 {os.path.basename(file_path)} 中删除规则: {rule_value}\n\n🔄 正在更新OpenClash规则...")
@@ -1105,7 +1147,7 @@ async def move_rule_and_commit(query, user_id):
 
         # 等待GitHub同步
         message_template = f"✅ 已将规则 {rule_value} 从 {os.path.basename(source_path)} 移动到 {os.path.basename(target_path)}\n\n⏳ 正在等待GitHub同步更新 ({{wait_time}}秒)..."
-        await wait_for_github_sync(query, message_template)
+        await wait_for_github_sync(query, message_template, repo, repo.head.commit.hexsha)
 
         # 更新OpenClash规则
         await query.edit_message_text(
@@ -1176,12 +1218,13 @@ async def add_rule_and_commit(query, user_data, file_path):
         # 提交并推送更改
         repo.git.add(file_path)
         repo.git.commit('-m', f'添加规则: {input_value} 到 {os.path.basename(file_path)}')
+        commit_hash = repo.head.commit.hexsha
         origin = repo.remotes.origin
         origin.push()
 
         # 等待GitHub同步
         message_template = f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n⏳ 正在等待GitHub同步更新 ({{wait_time}}秒)..."
-        await wait_for_github_sync(query, message_template)
+        await wait_for_github_sync(query, message_template, repo, commit_hash)
 
         # 更新OpenClash规则
         await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n🔄 正在更新OpenClash规则...")
@@ -1201,6 +1244,115 @@ async def add_rule_and_commit(query, user_data, file_path):
         logger.error(f"发生错误: {str(e)}\n{error_details}")
         await query.edit_message_text(f"❌ 操作失败: {str(e)}\n详细错误请查看日志。")
 
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理/search命令，搜索规则"""
+    # 检查权限
+    if not await check_permission(update):
+        await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
+        return
+        
+    user_id = update.effective_user.id
+    user_states[user_id] = {"action": "search_waiting"}
+    
+    await update.message.reply_text("🔍 请输入要搜索的域名或IP地址关键词:")
+
+async def handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYPE, search_term) -> None:
+    """处理搜索输入并显示结果"""
+    user_id = update.effective_user.id
+    search_results = []
+    
+    try:
+        # 获取仓库
+        await get_repo()
+        
+        # 在所有规则文件中搜索
+        for file_key, file_path in RULE_FILES.items():
+            full_path = os.path.join(REPO_PATH, file_path)
+            if os.path.exists(full_path):
+                rules = extract_rules_from_file(full_path)
+                for rule in rules:
+                    if search_term.lower() in rule['value'].lower():
+                        search_results.append({
+                            'file_key': file_key,
+                            'file_path': file_path,
+                            'rule': rule
+                        })
+        
+        # 显示搜索结果
+        if not search_results:
+            keyboard = [[InlineKeyboardButton("🔄 重新搜索", callback_data="action:search")],
+                       [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(f"❌ 未找到包含 '{search_term}' 的规则。", reply_markup=reply_markup)
+            return
+        
+        # 分页显示搜索结果
+        user_states[user_id] = {
+            "action": "search_results",
+            "results": search_results,
+            "page": 0,
+            "search_term": search_term
+        }
+        
+        await show_search_results(update.message, user_id, 0)
+        
+    except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"搜索规则时发生错误: {str(e)}\n{error_details}")
+        await update.message.reply_text(f"❌ 搜索失败: {str(e)}\n详细错误请查看日志。")
+
+async def show_search_results(message_obj, user_id, page):
+    """分页显示搜索结果"""
+    search_results = user_states[user_id]["results"]
+    search_term = user_states[user_id]["search_term"]
+    
+    # 计算分页
+    total_pages = (len(search_results) + RULES_PER_PAGE - 1) // RULES_PER_PAGE
+    start_idx = page * RULES_PER_PAGE
+    end_idx = min(start_idx + RULES_PER_PAGE, len(search_results))
+    current_results = search_results[start_idx:end_idx]
+    
+    # 构建结果显示文本
+    results_text = f"🔍 '{search_term}' 的搜索结果 ({len(search_results)}个匹配)\n\n"
+    
+    for i, result in enumerate(current_results, start=start_idx + 1):
+        file_name = os.path.basename(result['file_path'])
+        rule_value = result['rule']['value']
+        rule_type = "域名" if result['rule']['type'] == "domain" else "IP"
+        file_display = RULE_FILE_NAMES.get(result['file_key'], file_name)
+        results_text += f"{i}. {rule_value} [{rule_type}]\n   📁 {file_display}\n\n"
+    
+    # 构建分页按钮
+    keyboard = []
+    paging_buttons = []
+    
+    if page > 0:
+        paging_buttons.append(InlineKeyboardButton("◀️ 上一页", callback_data=f"search:page:{page-1}"))
+    
+    if page < total_pages - 1:
+        paging_buttons.append(InlineKeyboardButton("▶️ 下一页", callback_data=f"search:page:{page+1}"))
+    
+    if paging_buttons:
+        keyboard.append(paging_buttons)
+    
+    # 添加操作按钮
+    keyboard.append([InlineKeyboardButton("🔄 重新搜索", callback_data="action:search")])
+    keyboard.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # 显示结果
+    if hasattr(message_obj, 'edit_message_text'):
+        await message_obj.edit_message_text(
+            f"{results_text}\n页码: {page+1}/{total_pages}",
+            reply_markup=reply_markup
+        )
+    else:
+        await message_obj.reply_text(
+            f"{results_text}\n页码: {page+1}/{total_pages}",
+            reply_markup=reply_markup
+        )
+
 async def run_bot():
     """异步运行机器人"""
     # 创建应用并注册处理程序
@@ -1212,6 +1364,7 @@ async def run_bot():
     application.add_handler(CommandHandler("view", view_command))
     application.add_handler(CommandHandler("delete", delete_command))
     application.add_handler(CommandHandler("move", move_command))
+    application.add_handler(CommandHandler("search", search_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
     application.add_handler(CallbackQueryHandler(handle_callback))
 
