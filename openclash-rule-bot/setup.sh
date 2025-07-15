@@ -1,5 +1,24 @@
 #!/bin/sh
 
+# 检查必要文件是否存在
+check_file() {
+    if [ ! -f "$1" ]; then
+        echo "错误：必要文件 $1 不存在"
+        echo "请创建此文件并提供正确的内容"
+        return 1
+    fi
+    return 0
+}
+
+# 检查所有必要的配置文件
+echo "正在检查必要配置文件..."
+check_file "/root/TELEGRAM_TOKEN.txt" || exit 1
+check_file "/root/GITHUB_TOKEN.txt" || exit 1
+check_file "/root/AUTHORIZED_USER_ID.txt" || exit 1
+check_file "/root/OPENCLASH_API_SECRET.txt" || exit 1
+
+echo "所有必要配置文件已找到，继续安装..."
+
 # 安装必要的软件包
 opkg update
 opkg install git-http docker docker-compose coreutils-nohup
@@ -11,6 +30,8 @@ cd /root/openclash-bot
 # 读取令牌值
 TELEGRAM_TOKEN=$(cat /root/TELEGRAM_TOKEN.txt)
 GITHUB_TOKEN=$(cat /root/GITHUB_TOKEN.txt)
+# 设置授权用户ID（替换为您自己的Telegram用户ID）
+AUTHORIZED_USER_ID=$(cat /root/AUTHORIZED_USER_ID.txt)
 # OpenClash API 配置
 OPENCLASH_API_URL="http://192.168.6.1:9090"
 OPENCLASH_API_SECRET=$(cat /root/OPENCLASH_API_SECRET.txt)
@@ -47,6 +68,8 @@ REPO_URL = f"https://x-access-token:{GITHUB_TOKEN}@github.com/AceDylan/Custom_Op
 REPO_PATH = "/app/repo"
 OPENCLASH_API_URL = "${OPENCLASH_API_URL}"
 OPENCLASH_API_SECRET = "${OPENCLASH_API_SECRET}"
+# 授权用户ID列表
+AUTHORIZED_USER_ID = "${AUTHORIZED_USER_ID}"
 
 # 规则文件列表
 RULE_FILES = {
@@ -81,8 +104,21 @@ user_states = {}
 # 每页显示的规则条数
 RULES_PER_PAGE = 10
 
+async def check_permission(update: Update) -> bool:
+    """检查用户是否有权限使用机器人"""
+    user_id = str(update.effective_user.id)
+    authorized = user_id == AUTHORIZED_USER_ID
+    if not authorized:
+        logger.warning(f"未授权的访问尝试：用户ID {user_id}")
+    return authorized
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/start命令"""
+    # 检查权限
+    if not await check_permission(update):
+        await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
+        return
+        
     user_name = update.effective_user.first_name
 
     # 创建功能按钮
@@ -108,6 +144,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/help命令"""
+    # 检查权限
+    if not await check_permission(update):
+        await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
+        return
+        
     await update.message.reply_text(
         "📖 *OpenClash规则管理机器人使用指南*\n\n"
         "📌 *基本操作：*\n\n"
@@ -172,6 +213,11 @@ async def wait_for_github_sync(query, message_template):
 
 async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理用户输入的域名或IP地址"""
+    # 检查权限
+    if not await check_permission(update):
+        await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
+        return
+        
     user_input = update.message.text.strip()
     user_id = update.effective_user.id
 
@@ -215,6 +261,11 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def view_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/view命令，查看规则"""
+    # 检查权限
+    if not await check_permission(update):
+        await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
+        return
+        
     user_id = update.effective_user.id
     user_states[user_id] = {"action": "view", "page": 0}
 
@@ -227,6 +278,11 @@ async def view_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/delete命令，删除规则"""
+    # 检查权限
+    if not await check_permission(update):
+        await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
+        return
+        
     user_id = update.effective_user.id
     user_states[user_id] = {"action": "delete"}
 
@@ -239,6 +295,11 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def move_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/move命令，移动规则"""
+    # 检查权限
+    if not await check_permission(update):
+        await update.message.reply_text("❌ 对不起，您没有权限使用此机器人。")
+        return
+        
     user_id = update.effective_user.id
     user_states[user_id] = {"action": "move", "step": "select_source"}
 
@@ -409,6 +470,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """处理按钮回调"""
     query = update.callback_query
     await query.answer()
+    
+    # 检查权限
+    if not await check_permission(update):
+        await query.edit_message_text("❌ 对不起，您没有权限使用此机器人。")
+        return
 
     user_id = update.effective_user.id
     if user_id not in user_states and not query.data.startswith("action:"):
@@ -1207,6 +1273,14 @@ EOF
 # 创建repo目录
 mkdir -p repo
 
+# 检查授权用户ID文件是否存在
+if [ ! -f /root/AUTHORIZED_USER_ID.txt ]; then
+    echo "请创建/root/AUTHORIZED_USER_ID.txt文件，并将您的Telegram用户ID写入该文件"
+    echo "您可以通过与@userinfobot机器人对话来获取您的Telegram用户ID"
+    echo "创建完成后，请重新运行此脚本"
+    exit 1
+fi
+
 # 配置git用户信息
 git config --global user.email "1041151706@qq.com"
 git config --global user.name "AceDylan"
@@ -1217,4 +1291,6 @@ docker-compose up -d --build
 echo "-------------------------------------"
 echo "✅ OpenClash规则管理机器人已启动"
 echo "🤖 您可以在Telegram上搜索您的机器人并开始使用"
+echo "🔒 已启用权限控制，只有授权用户ID可以使用此机器人"
+echo "🆔 当前授权用户ID: $(cat /root/AUTHORIZED_USER_ID.txt)"
 echo "-------------------------------------" 
