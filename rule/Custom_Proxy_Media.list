@@ -67,3 +67,6 @@ DOMAIN-SUFFIX,hdhive.online
 
 # 添加域名 pypi.org
 DOMAIN-SUFFIX,pypi.org
+
+# 添加域名 jetbrains.com
+DOMAIN-SUFFIX,jetbrains.com
