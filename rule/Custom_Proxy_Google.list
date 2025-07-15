@@ -4,3 +4,6 @@ DOMAIN-SUFFIX,xn--ngstr-lra8j.com
 
 # 添加域名 cloudflare.com
 DOMAIN-SUFFIX,cloudflare.com
+
+# 添加域名 samsung.com
+DOMAIN-SUFFIX,samsung.com
