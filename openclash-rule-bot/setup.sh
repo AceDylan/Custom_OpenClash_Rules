@@ -467,11 +467,11 @@ async def refresh_openclash_rule(file_path):
                     
                     if response.status_code != 204:
                         # 如果API调用失败，记录错误并继续尝试
-                        update_message.warning(f"第 {attempt+1} 次刷新规则失败，状态码: {response.status_code}")
+                        logger.warning(f"第 {attempt+1} 次刷新规则失败，状态码: {response.status_code}")
                         await asyncio.sleep(retry_delay)
                         continue
                 except Exception as e:
-                    update_message.warning(f"第 {attempt+1} 次刷新规则请求异常: {str(e)}")
+                    logger.warning(f"第 {attempt+1} 次刷新规则请求异常: {str(e)}")
                     await asyncio.sleep(retry_delay)
                     continue
                 
@@ -489,7 +489,7 @@ async def refresh_openclash_rule(file_path):
                     break
                 
                 # 如果还没成功，继续下一次尝试（会再次调用更新接口）
-                update_message.info(f"第 {attempt+1} 次刷新尝试后，规则数量未变化，将重试...")
+                logger.info(f"第 {attempt+1} 次刷新尝试后，规则数量未变化，将重试...")
             
             # 如果所有尝试后仍未成功
             if not update_success:
