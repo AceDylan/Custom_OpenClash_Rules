@@ -1336,6 +1336,7 @@ async def move_rule_and_commit(query, user_id):
 
         # 更新两个受影响的规则
         source_update = await refresh_openclash_rule(source_path)
+        target_update = await refresh_openclash_rule(target_path)
 
         # 显示完成信息
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:move")]]
