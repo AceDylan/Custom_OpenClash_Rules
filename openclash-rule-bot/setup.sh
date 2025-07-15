@@ -259,7 +259,7 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     # 处理添加规则输入
     if user_id in user_states and user_states[user_id].get("action") == "add_waiting_input":
-        await add_rule_and_commit(update, context, user_input)
+        await add_rule_and_commit(update, user_states[user_id], user_input)
         return
 
     # 验证输入是域名还是IP
@@ -714,8 +714,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif callback_data.startswith("add:file:"):
         file_key = callback_data.split(":")[2]
         if file_key in RULE_FILES:
+            user_states[user_id]["file_key"] = file_key
             file_path = RULE_FILES[file_key]
-            await add_rule_and_commit(update, context, file_path)
+            await add_rule_and_commit(query, user_states[user_id], file_path)
         else:
             await query.edit_message_text("❌ 无效的文件选择，请重新操作。")
 
@@ -1267,13 +1268,29 @@ async def move_rule_and_commit(query, user_id):
 
 async def add_rule_and_commit(query, user_data, file_path):
     """添加规则到文件并提交到Git仓库"""
-    input_value = user_data["input"]
-    input_type = user_data["type"]
+    # 根据调用来源确定参数类型
+    is_from_callback = hasattr(query, 'edit_message_text')
+    
+    if isinstance(file_path, str) and (file_path in RULE_FILES.values()):
+        # 如果第三个参数是文件路径（来自回调查询）
+        input_value = user_data["input"]
+        input_type = user_data["type"]
+    else:
+        # 如果第三个参数是用户输入（来自直接消息）
+        input_value = file_path
+        input_type = user_data["type"]
+        # 找到用户选择的文件
+        file_path = RULE_FILES[user_data["file_key"]]
 
     try:
         # 获取仓库
         repo = await get_repo()
-        await query.edit_message_text("🔄 正在更新仓库...")
+        
+        # 根据调用来源选择显示消息的方法
+        if is_from_callback:
+            await query.edit_message_text("🔄 正在更新仓库...")
+        else:
+            await query.message.reply_text("🔄 正在更新仓库...")
 
         # 添加规则到文件
         full_path = os.path.join(REPO_PATH, file_path)
@@ -1298,7 +1315,10 @@ async def add_rule_and_commit(query, user_data, file_path):
                     rule_exists = True
 
         if rule_exists:
-            await query.edit_message_text(f"ℹ️ 规则 '{input_value}' 已存在于文件中，无需添加。")
+            if is_from_callback:
+                await query.edit_message_text(f"ℹ️ 规则 '{input_value}' 已存在于文件中，无需添加。")
+            else:
+                await query.message.reply_text(f"ℹ️ 规则 '{input_value}' 已存在于文件中，无需添加。")
             return
 
         # 追加规则到文件
@@ -1314,25 +1334,50 @@ async def add_rule_and_commit(query, user_data, file_path):
 
         # 等待GitHub同步
         message_template = f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n⏳ 正在等待GitHub同步更新 ({{wait_time}}秒)..."
-        await wait_for_github_sync(query, message_template, repo, commit_hash)
-
-        # 更新OpenClash规则
-        await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n🔄 正在更新OpenClash规则...")
-        update_message = await refresh_openclash_rule(file_path)
-
-        # 创建返回主菜单按钮
-        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:add")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.edit_message_text(
-            f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n{update_message}",
-            reply_markup=reply_markup
-        )
+        
+        if is_from_callback:
+            await wait_for_github_sync(query, message_template, repo, commit_hash)
+            # 更新OpenClash规则
+            await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n🔄 正在更新OpenClash规则...")
+            update_message = await refresh_openclash_rule(file_path)
+            
+            # 创建返回主菜单按钮
+            keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:add")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n{update_message}",
+                reply_markup=reply_markup
+            )
+        else:
+            # 为直接消息方式创建一个临时消息对象
+            temp_message = await query.message.reply_text(message_template.format(wait_time=60))
+            
+            # 手动等待GitHub同步，而不使用wait_for_github_sync函数
+            await asyncio.sleep(20)  # 给GitHub一些时间来同步
+            
+            # 更新OpenClash规则
+            await temp_message.edit_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n🔄 正在更新OpenClash规则...")
+            update_message = await refresh_openclash_rule(file_path)
+            
+            # 创建返回主菜单按钮
+            keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:add")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await temp_message.edit_text(
+                f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n{update_message}",
+                reply_markup=reply_markup
+            )
 
     except Exception as e:
         error_details = traceback.format_exc()
         logger.error(f"发生错误: {str(e)}\n{error_details}")
-        await query.edit_message_text(f"❌ 操作失败: {str(e)}\n详细错误请查看日志。")
+        error_message = f"❌ 操作失败: {str(e)}\n详细错误请查看日志。"
+        
+        if is_from_callback:
+            await query.edit_message_text(error_message)
+        else:
+            await query.message.reply_text(error_message)
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/search命令，搜索规则"""
