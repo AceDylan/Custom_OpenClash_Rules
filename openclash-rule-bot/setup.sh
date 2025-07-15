@@ -1334,8 +1334,9 @@ async def move_rule_and_commit(query, user_id):
             f"🔄 正在更新OpenClash规则..."
         )
 
-        # 只更新源规则文件，目标规则文件已经自动更新
+        # 更新两个受影响的规则
         source_update = await refresh_openclash_rule(source_path)
+        target_update = await refresh_openclash_rule(target_path)
 
         # 显示完成信息
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:move")]]
@@ -1343,7 +1344,8 @@ async def move_rule_and_commit(query, user_id):
 
         await query.edit_message_text(
             f"✅ 已将规则 {rule_value} 从 {os.path.basename(source_path)} 移动到 {os.path.basename(target_path)}\n\n"
-            f"规则更新: {source_update}",
+            f"源文件更新: {source_update}\n"
+            f"目标文件更新: {target_update}",
             reply_markup=reply_markup
         )
 
