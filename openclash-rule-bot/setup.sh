@@ -757,10 +757,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             else:
                 await query.edit_message_text("❌ 无效的文件选择，请重新操作。")
         elif parts[1] == "page":
+            if "viewing_file" not in user_states[user_id]:
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
             file_path = user_states[user_id]["viewing_file"]
-            page = int(parts[2])
-            user_states[user_id]["page"] = page
-            await show_rules_page(query, user_id, file_path, page)
+            try:
+                page = int(parts[2])
+                user_states[user_id]["page"] = page
+                await show_rules_page(query, user_id, file_path, page)
+            except (ValueError, IndexError):
+                await query.edit_message_text("❌ 无效的页码，请重新操作。")
 
     # 删除规则
     elif callback_data.startswith("delete:"):
@@ -775,24 +782,45 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             else:
                 await query.edit_message_text("❌ 无效的文件选择，请重新操作。")
         elif parts[1] == "page":
+            if "deleting_file" not in user_states[user_id]:
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
             file_path = user_states[user_id]["deleting_file"]
-            page = int(parts[2])
-            user_states[user_id]["page"] = page
-            await show_deletable_rules(query, user_id, file_path, page)
-        elif parts[1] == "rule":
-            file_path = user_states[user_id]["deleting_file"]
-            rule_index = int(parts[2])
-            await confirm_delete_rule(query, user_id, file_path, rule_index)
-        elif parts[1] == "confirm":
-            file_path = user_states[user_id]["deleting_file"]
-            rule_index = int(parts[2])
-            action = parts[3]
-            if action == "yes":
-                await delete_rule_and_commit(query, user_id, file_path, rule_index)
-            else:
-                # 返回规则列表
-                page = user_states[user_id].get("page", 0)
+            try:
+                page = int(parts[2])
+                user_states[user_id]["page"] = page
                 await show_deletable_rules(query, user_id, file_path, page)
+            except (ValueError, IndexError):
+                await query.edit_message_text("❌ 无效的页码，请重新操作。")
+        elif parts[1] == "rule":
+            if "deleting_file" not in user_states[user_id]:
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
+            file_path = user_states[user_id]["deleting_file"]
+            try:
+                rule_index = int(parts[2])
+                await confirm_delete_rule(query, user_id, file_path, rule_index)
+            except (ValueError, IndexError):
+                await query.edit_message_text("❌ 无效的规则索引，请重新操作。")
+        elif parts[1] == "confirm":
+            if "deleting_file" not in user_states[user_id]:
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
+            file_path = user_states[user_id]["deleting_file"]
+            try:
+                rule_index = int(parts[2])
+                action = parts[3]
+                if action == "yes":
+                    await delete_rule_and_commit(query, user_id, file_path, rule_index)
+                else:
+                    # 返回规则列表
+                    page = user_states[user_id].get("page", 0)
+                    await show_deletable_rules(query, user_id, file_path, page)
+            except (ValueError, IndexError):
+                await query.edit_message_text("❌ 无效的操作参数，请重新操作。")
 
     # 移动规则
     elif callback_data.startswith("move:"):
@@ -808,37 +836,63 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             else:
                 await query.edit_message_text("❌ 无效的文件选择，请重新操作。")
         elif parts[1] == "page":
+            if "source_file" not in user_states[user_id]:
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
             source_path = user_states[user_id]["source_file"]
-            page = int(parts[2])
-            user_states[user_id]["page"] = page
-            await show_movable_rules(query, user_id, source_path, page)
+            try:
+                page = int(parts[2])
+                user_states[user_id]["page"] = page
+                await show_movable_rules(query, user_id, source_path, page)
+            except (ValueError, IndexError):
+                await query.edit_message_text("❌ 无效的页码，请重新操作。")
         elif parts[1] == "rule":
+            if "source_file" not in user_states[user_id] or user_states[user_id].get("step") != "select_rule":
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
             source_path = user_states[user_id]["source_file"]
-            rule_index = int(parts[2])
-            user_states[user_id]["rule_index"] = rule_index
-            user_states[user_id]["step"] = "select_target"
+            try:
+                rule_index = int(parts[2])
+                user_states[user_id]["rule_index"] = rule_index
+                user_states[user_id]["step"] = "select_target"
 
-            # 显示目标文件选择菜单（不包括当前源文件）
-            keyboard = []
-            source_key = next((k for k, v in RULE_FILES.items() if v == source_path), None)
-            for key, name in RULE_FILE_NAMES.items():
-                if key != source_key:  # 排除源文件
-                    keyboard.append([InlineKeyboardButton(name, callback_data=f"move:target:{key}")])
-            keyboard.append([InlineKeyboardButton("↩️ 返回", callback_data=f"move:cancel")])
-            reply_markup = InlineKeyboardMarkup(keyboard)
+                # 显示目标文件选择菜单（不包括当前源文件）
+                keyboard = []
+                source_key = next((k for k, v in RULE_FILES.items() if v == source_path), None)
+                for key, name in RULE_FILE_NAMES.items():
+                    if key != source_key:  # 排除源文件
+                        keyboard.append([InlineKeyboardButton(name, callback_data=f"move:target:{key}")])
+                keyboard.append([InlineKeyboardButton("↩️ 返回", callback_data=f"move:cancel")])
+                reply_markup = InlineKeyboardMarkup(keyboard)
 
-            # 获取规则信息用于显示
-            full_path = os.path.join(REPO_PATH, source_path)
-            rules = extract_rules_from_file(full_path)
-            rule_info = rules[rule_index]
+                # 获取规则信息用于显示
+                full_path = os.path.join(REPO_PATH, source_path)
+                if not os.path.exists(full_path):
+                    await query.edit_message_text(f"❌ 源文件 {os.path.basename(source_path)} 不存在。")
+                    return
+                    
+                rules = extract_rules_from_file(full_path)
+                if rule_index >= len(rules):
+                    await query.edit_message_text("❌ 规则索引无效，请重新操作。")
+                    return
+                    
+                rule_info = rules[rule_index]
 
-            await query.edit_message_text(
-                f"↔️ 请选择要将规则移动到哪个文件：\n\n"
-                f"当前规则：{rule_info['value']}\n"
-                f"当前文件：{os.path.basename(source_path)}",
-                reply_markup=reply_markup
-            )
+                await query.edit_message_text(
+                    f"↔️ 请选择要将规则移动到哪个文件：\n\n"
+                    f"当前规则：{rule_info['value']}\n"
+                    f"当前文件：{os.path.basename(source_path)}",
+                    reply_markup=reply_markup
+                )
+            except (ValueError, IndexError):
+                await query.edit_message_text("❌ 无效的规则索引，请重新操作。")
         elif parts[1] == "target":
+            if "source_file" not in user_states[user_id] or "rule_index" not in user_states[user_id] or user_states[user_id].get("step") != "select_target":
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
             target_key = parts[2]
             if target_key in RULE_FILES:
                 target_path = RULE_FILES[target_key]
@@ -848,6 +902,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 await query.edit_message_text("❌ 无效的文件选择，请重新操作。")
         elif parts[1] == "cancel":
             # 返回源文件的规则列表
+            if "source_file" not in user_states[user_id]:
+                await query.edit_message_text("❌ 会话状态错误，请重新开始。")
+                return
+                
             source_path = user_states[user_id]["source_file"]
             page = user_states[user_id].get("page", 0)
             user_states[user_id]["step"] = "select_rule"
@@ -1038,8 +1096,19 @@ async def delete_rule_and_commit(query, user_id, file_path, rule_index):
         # 获取仓库
         repo = await get_repo()
 
+        # 检查文件路径和规则索引是否有效
+        if not file_path or not isinstance(rule_index, int):
+            await query.edit_message_text("❌ 无效的文件路径或规则索引。")
+            return
+
         # 获取规则信息
         full_path = os.path.join(REPO_PATH, file_path)
+        
+        # 检查文件是否存在
+        if not os.path.exists(full_path):
+            await query.edit_message_text(f"❌ 规则文件 {os.path.basename(file_path)} 不存在。")
+            return
+            
         rules = extract_rules_from_file(full_path)
 
         if rule_index >= len(rules):
@@ -1179,6 +1248,13 @@ async def move_rule_and_commit(query, user_id):
         # 获取仓库
         repo = await get_repo()
 
+        # 检查用户状态中是否包含所需的所有键
+        required_keys = ["source_file", "target_file", "rule_index"]
+        missing_keys = [key for key in required_keys if key not in user_states[user_id]]
+        if missing_keys:
+            await query.edit_message_text(f"❌ 操作失败：缺少必要信息 {', '.join(missing_keys)}")
+            return
+
         # 获取源文件和目标文件
         source_path = user_states[user_id]["source_file"]
         target_path = user_states[user_id]["target_file"]
@@ -1295,16 +1371,61 @@ async def add_rule_and_commit(query, user_data, file_path):
     # 根据调用来源确定参数类型
     is_from_callback = hasattr(query, 'edit_message_text')
     
+    # 严格检查参数是否有效
+    if not user_data or not isinstance(user_data, dict):
+        error_message = "❌ 内部错误：无效的用户数据。"
+        if is_from_callback:
+            await query.edit_message_text(error_message)
+        else:
+            await query.message.reply_text(error_message)
+        return
+        
+    # 确定文件路径和输入值
     if isinstance(file_path, str) and (file_path in RULE_FILES.values()):
         # 如果第三个参数是文件路径（来自回调查询）
+        if "input" not in user_data or "type" not in user_data:
+            error_message = "❌ 内部错误：缺少输入数据或类型信息。"
+            if is_from_callback:
+                await query.edit_message_text(error_message)
+            else:
+                await query.message.reply_text(error_message)
+            return
+        
         input_value = user_data["input"]
         input_type = user_data["type"]
     else:
         # 如果第三个参数是用户输入（来自直接消息）
         input_value = file_path
-        input_type = user_data["type"]
+        input_type = user_data.get("type")
+        
+        if not input_type:
+            error_message = "❌ 内部错误：缺少输入类型信息。"
+            if is_from_callback:
+                await query.edit_message_text(error_message)
+            else:
+                await query.message.reply_text(error_message)
+            return
+            
+        # 检查是否有file_key
+        if "file_key" not in user_data:
+            error_message = "❌ 内部错误：缺少文件键信息。"
+            if is_from_callback:
+                await query.edit_message_text(error_message)
+            else:
+                await query.message.reply_text(error_message)
+            return
+            
         # 找到用户选择的文件
-        file_path = RULE_FILES[user_data["file_key"]]
+        file_key = user_data["file_key"]
+        if file_key not in RULE_FILES:
+            error_message = f"❌ 内部错误：无效的文件键 '{file_key}'。"
+            if is_from_callback:
+                await query.edit_message_text(error_message)
+            else:
+                await query.message.reply_text(error_message)
+            return
+            
+        file_path = RULE_FILES[file_key]
 
     try:
         # 获取仓库
