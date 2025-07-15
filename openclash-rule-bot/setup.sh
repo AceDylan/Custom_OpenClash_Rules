@@ -1082,6 +1082,5 @@ docker-compose up -d --build
 
 echo "-------------------------------------"
 echo "✅ OpenClash规则管理机器人已启动"
-echo "📝 请记得修改bot.py文件中的GitHub用户名"
 echo "🤖 您可以在Telegram上搜索您的机器人并开始使用"
 echo "-------------------------------------" 
