@@ -18,3 +18,6 @@ DOMAIN-SUFFIX,vban.xyz
 
 # 添加域名 samsung.com
 DOMAIN-SUFFIX,samsung.com
+
+# 添加域名 samsungapps.com
+DOMAIN-SUFFIX,samsungapps.com
