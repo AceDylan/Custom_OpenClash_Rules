@@ -271,6 +271,18 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text("❌ 输入格式不正确，请输入有效的域名或IP地址。")
             return
         
+        # 检查是否已有file_key，如果没有则让用户选择文件
+        if "file_key" not in user_states[user_id]:
+            # 创建文件选择菜单
+            keyboard = []
+            for key, name in RULE_FILE_NAMES.items():
+                keyboard.append([InlineKeyboardButton(name, callback_data=f"add:file:{key}")])
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text("🔽 请选择要添加到哪个规则文件:", reply_markup=reply_markup)
+            return
+        
+        # 已有file_key，可以直接调用add_rule_and_commit
         await add_rule_and_commit(update, user_states[user_id], user_input)
         return
 
