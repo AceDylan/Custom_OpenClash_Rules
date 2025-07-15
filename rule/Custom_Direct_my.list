@@ -14,3 +14,6 @@ DOMAIN-SUFFIX,acedylan.us
 
 # 添加域名 vban.xyz
 DOMAIN-SUFFIX,vban.xyz
+
+# 添加IP 1.1.1.1
+IP-CIDR,1.1.1.1/32,no-resolve

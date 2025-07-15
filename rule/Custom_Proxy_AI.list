@@ -8,5 +8,3 @@ DOMAIN-SUFFIX,sider.ai
 # 添加域名 stripe.com
 DOMAIN-SUFFIX,stripe.com
 
-# 添加IP 1.1.1.1
-IP-CIDR,1.1.1.1/32,no-resolve
