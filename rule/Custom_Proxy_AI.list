@@ -8,3 +8,6 @@ DOMAIN-SUFFIX,sider.ai
 # 添加域名 stripe.com
 DOMAIN-SUFFIX,stripe.com
 
+
+# 添加域名 monica.cool
+DOMAIN-SUFFIX,monica.cool
