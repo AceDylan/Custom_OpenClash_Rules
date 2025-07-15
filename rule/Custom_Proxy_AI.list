@@ -4,3 +4,6 @@ DOMAIN-SUFFIX,monica.im
 
 # Sider
 DOMAIN-SUFFIX,sider.ai
+
+# 添加域名 stripe.com
+DOMAIN-SUFFIX,stripe.com
