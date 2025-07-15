@@ -70,3 +70,6 @@ DOMAIN-SUFFIX,pypi.org
 
 # 添加域名 jetbrains.com
 DOMAIN-SUFFIX,jetbrains.com
+
+# 添加域名 fastlydns.net
+DOMAIN-SUFFIX,fastlydns.net
