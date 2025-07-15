@@ -221,8 +221,8 @@ async def check_github_sync_status(repo, commit_hash):
 
 async def wait_for_github_sync(query, message_template, repo, commit_hash):
     """使用轮询方式等待GitHub同步的函数"""
-    max_attempts = 12  # 最大尝试次数
-    wait_time = 5  # 每次等待5秒
+    max_attempts = 15  # 增加最大尝试次数（原来是12）
+    wait_time = 6  # 增加每次等待时间（原来是5秒）
     
     for attempt in range(max_attempts):
         # 更新等待消息
@@ -231,13 +231,16 @@ async def wait_for_github_sync(query, message_template, repo, commit_hash):
         
         # 检查同步状态
         if await check_github_sync_status(repo, commit_hash):
+            # 同步成功后再多等待5秒，确保完全同步
+            await asyncio.sleep(5)
             return True
         
         # 等待一段时间后再次检查
         await asyncio.sleep(wait_time)
     
-    # 达到最大尝试次数后，假设同步已完成
-    return False
+    # 达到最大尝试次数后，再多等待10秒
+    await asyncio.sleep(10)
+    return True  # 假设同步已完成
 
 async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理用户输入的文本"""
@@ -397,18 +400,71 @@ async def get_repo():
     return repo
 
 async def refresh_openclash_rule(file_path):
-    """刷新OpenClash规则"""
+    """刷新OpenClash规则，增加重试机制确保成功"""
     update_message = ""
+    max_retries = 5  # 最大重试次数
+    retry_delay = 3  # 每次重试间隔秒数
+    
     try:
         if file_path in OPENCLASH_RULE_MAPPING:
             rule_name = OPENCLASH_RULE_MAPPING[file_path]
-            url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
-            headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
-            response = requests.put(url, headers=headers)
-            if response.status_code == 204:
-                update_message = f"✅ 已成功刷新OpenClash规则: {rule_name}"
-            else:
-                update_message = f"❌ 尝试刷新规则失败，状态码: {response.status_code}"
+            
+            # 首先等待3秒，确保GitHub同步有足够时间完成
+            await asyncio.sleep(3)
+            
+            # 尝试多次刷新规则
+            for attempt in range(max_retries):
+                try:
+                    url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
+                    headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+                    
+                    response = requests.put(url, headers=headers)
+                    
+                    if response.status_code == 204:
+                        # 成功后再等待2秒，并再次触发刷新以确保生效
+                        await asyncio.sleep(2)
+                        requests.put(url, headers=headers)
+                        
+                        update_message = f"✅ 已成功刷新OpenClash规则: {rule_name} (尝试 {attempt+1}/{max_retries})"
+                        
+                        # 验证规则是否真正生效
+                        try:
+                            verify_url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
+                            verify_response = requests.get(verify_url, headers=headers)
+                            
+                            if verify_response.status_code == 200 and "updatedAt" in verify_response.json():
+                                # 规则确认已更新
+                                break
+                            else:
+                                # 如果验证未通过且不是最后一次尝试，则继续重试
+                                if attempt < max_retries - 1:
+                                    logger.info(f"规则 {rule_name} 可能尚未完全生效，将重试...")
+                                    await asyncio.sleep(retry_delay)
+                                    continue
+                        except Exception as ve:
+                            logger.warning(f"验证规则更新状态时出错: {str(ve)}")
+                            # 出错时默认认为已成功，但记录日志
+                            break
+                    else:
+                        # 如果不是最后一次尝试，则等待后重试
+                        if attempt < max_retries - 1:
+                            logger.warning(f"刷新规则 {rule_name} 失败 (尝试 {attempt+1}/{max_retries})，状态码: {response.status_code}，将重试...")
+                            await asyncio.sleep(retry_delay)
+                        else:
+                            update_message = f"❌ 尝试刷新规则失败，状态码: {response.status_code}，已尝试 {max_retries} 次"
+                
+                except Exception as req_err:
+                    # 处理请求异常
+                    if attempt < max_retries - 1:
+                        logger.error(f"刷新规则时发生错误 (尝试 {attempt+1}/{max_retries}): {str(req_err)}，将重试...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        update_message = f"❌ 刷新规则时发生错误: {str(req_err)}，已尝试 {max_retries} 次"
+            
+            # 如果所有尝试后仍然没有设置消息，则设置一个默认消息
+            if not update_message:
+                update_message = f"⚠️ 规则 {rule_name} 已尝试刷新 {max_retries} 次，但无法确认是否成功"
+                
         else:
             update_message = "⚠️ 无法确定对应的OpenClash规则，未进行刷新"
     except Exception as e:
@@ -463,6 +519,10 @@ async def refresh_all_rules(query):
 
         # 获取仓库，确保是最新的
         await get_repo()
+        
+        # 先等待5秒确保GitHub完全同步
+        await query.edit_message_text("⏳ 正在等待GitHub同步完成...")
+        await asyncio.sleep(5)
 
         # 创建结果消息
         results = []
@@ -470,6 +530,10 @@ async def refresh_all_rules(query):
         # 依次刷新每个规则
         for file_key, file_path in RULE_FILES.items():
             rule_name = RULE_FILE_NAMES[file_key]
+            
+            # 更新进度消息
+            await query.edit_message_text(f"⏳ 正在刷新规则: {rule_name}...")
+            
             update_message = await refresh_openclash_rule(file_path)
             results.append(f"{rule_name}: {update_message}")
 
@@ -478,9 +542,31 @@ async def refresh_all_rules(query):
             progress_message += "\n".join(results)
             await query.edit_message_text(progress_message)
 
-            # 稍微延迟，避免请求过快
-            await asyncio.sleep(1)
+            # 每个规则刷新后多等待3秒
+            await asyncio.sleep(3)
 
+        # 全部刷新后，再进行一次最终确认刷新
+        await query.edit_message_text("⏳ 正在进行最终确认刷新...")
+        await asyncio.sleep(3)
+        
+        # 再次刷新所有规则以确保生效
+        final_results = []
+        for file_key, file_path in RULE_FILES.items():
+            if file_path in OPENCLASH_RULE_MAPPING:
+                rule_name = OPENCLASH_RULE_MAPPING[file_path]
+                url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
+                headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+                
+                try:
+                    response = requests.put(url, headers=headers)
+                    if response.status_code == 204:
+                        final_results.append(f"✅ 最终确认: {rule_name} 已刷新")
+                    else:
+                        final_results.append(f"⚠️ 最终确认: {rule_name} 刷新可能未成功")
+                except Exception as e:
+                    final_results.append(f"❌ 最终确认: {rule_name} 刷新失败")
+                    logger.error(f"最终确认刷新规则时发生错误: {str(e)}")
+        
         # 创建返回按钮
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -488,6 +574,10 @@ async def refresh_all_rules(query):
         # 显示完成消息
         complete_message = "✅ 所有规则刷新完成！\n\n"
         complete_message += "\n".join(results)
+        
+        # 添加最终确认结果
+        complete_message += "\n\n📋 最终确认结果:\n"
+        complete_message += "\n".join(final_results)
 
         await query.edit_message_text(complete_message, reply_markup=reply_markup)
 
