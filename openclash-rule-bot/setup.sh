@@ -90,7 +90,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton("➕ 添加规则", callback_data="action:add")],
         [InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")],
         [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
-        [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")]
+        [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
+        [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -98,7 +99,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"🚀 *欢迎 {user_name} 使用 OpenClash 规则管理机器人！*\n\n"
         "✨ *功能简介：*\n"
         "此机器人可以帮您管理OpenClash规则，支持添加、查看、删除和移动规则。\n\n"
-        "请选择您要执行的操作：",
+        "请选择您要执行的操作：\n"
+        "或者使用 /help 查看详细使用说明",
         parse_mode='Markdown',
         reply_markup=reply_markup
     )
@@ -149,6 +151,21 @@ def is_valid_ip(ip):
             return False
     return True
 
+async def wait_for_github_sync(query, message_template):
+    """等待GitHub同步更新的倒计时函数"""
+    # 通知用户正在等待GitHub更新，并设置60秒倒计时
+    await query.edit_message_text(message_template.format(wait_time=60))
+
+    # 每10秒更新一次倒计时消息
+    wait_time = 60
+    while wait_time > 0:
+        await asyncio.sleep(10)
+        wait_time -= 10
+        if wait_time > 0:
+            await query.edit_message_text(message_template.format(wait_time=wait_time))
+
+    return
+
 async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理用户输入的域名或IP地址"""
     user_input = update.message.text.strip()
@@ -165,7 +182,8 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             [InlineKeyboardButton("➕ 添加规则", callback_data="action:add")],
             [InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")],
             [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
-            [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")]
+            [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
+            [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -377,6 +395,61 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 keyboard.append([InlineKeyboardButton(name, callback_data=f"move:source:{key}")])
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text("↔️ 请选择源规则文件:", reply_markup=reply_markup)
+            return
+        elif action == "help":
+            # 调用帮助命令逻辑
+            keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                "📖 *OpenClash规则管理机器人使用指南*\n\n"
+                "📌 *基本操作：*\n\n"
+                "➕ *添加规则：*\n"
+                "- 直接发送域名或IP地址\n"
+                "- 选择要添加到哪个规则文件\n"
+                "- 机器人将自动添加规则并更新\n\n"
+                "👁️ *查看规则：*\n"
+                "- 使用 /view 命令\n"
+                "- 选择要查看的规则文件\n"
+                "- 使用分页浏览规则内容\n\n"
+                "❌ *删除规则：*\n"
+                "- 使用 /delete 命令\n"
+                "- 选择规则文件并选择要删除的规则\n"
+                "- 确认删除后机器人将更新规则\n\n"
+                "↔️ *移动规则：*\n"
+                "- 使用 /move 命令\n"
+                "- 选择源规则文件并选择要移动的规则\n"
+                "- 选择目标规则文件完成移动\n\n"
+                "📋 *支持的规则文件：*\n"
+                "• 🤖 AI代理规则 (Custom_Proxy_AI.list)\n"
+                "• 🏠 直连规则 (Custom_Direct_my.list)\n"
+                "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
+                "• 📺 国外媒体代理规则 (Custom_Proxy_Media.list)\n"
+                "• 🔍 Google代理规则 (Custom_Proxy_Google.list)",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+        elif action == "start":
+            # 返回主菜单
+            keyboard = [
+                [InlineKeyboardButton("➕ 添加规则", callback_data="action:add")],
+                [InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")],
+                [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
+                [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
+                [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                f"🚀 *欢迎使用 OpenClash 规则管理机器人！*\n\n"
+                "✨ *功能简介：*\n"
+                "此机器人可以帮您管理OpenClash规则，支持添加、查看、删除和移动规则。\n\n"
+                "请选择您要执行的操作：\n"
+                "或者使用 /help 查看详细使用说明",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
             return
 
     # 添加规则
@@ -722,6 +795,10 @@ async def delete_rule_and_commit(query, user_id, file_path, rule_index):
         origin = repo.remotes.origin
         origin.push()
 
+        # 等待GitHub同步
+        message_template = f"✅ 已从 {os.path.basename(file_path)} 中删除规则: {rule_value}\n\n⏳ 正在等待GitHub同步更新 ({{wait_time}}秒)..."
+        await wait_for_github_sync(query, message_template)
+
         # 更新OpenClash规则
         await query.edit_message_text(f"✅ 已从 {os.path.basename(file_path)} 中删除规则: {rule_value}\n\n🔄 正在更新OpenClash规则...")
         update_message = await refresh_openclash_rule(file_path)
@@ -900,6 +977,10 @@ async def move_rule_and_commit(query, user_id):
         origin = repo.remotes.origin
         origin.push()
 
+        # 等待GitHub同步
+        message_template = f"✅ 已将规则 {rule_value} 从 {os.path.basename(source_path)} 移动到 {os.path.basename(target_path)}\n\n⏳ 正在等待GitHub同步更新 ({{wait_time}}秒)..."
+        await wait_for_github_sync(query, message_template)
+
         # 更新OpenClash规则
         await query.edit_message_text(
             f"✅ 已将规则 {rule_value} 从 {os.path.basename(source_path)} 移动到 {os.path.basename(target_path)}\n\n"
@@ -972,16 +1053,9 @@ async def add_rule_and_commit(query, user_data, file_path):
         origin = repo.remotes.origin
         origin.push()
 
-        # 通知用户正在等待GitHub更新，并设置60秒倒计时
-        await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n⏳ 正在等待GitHub同步更新 (60秒)...")
-
-        # 每10秒更新一次倒计时消息
-        wait_time = 60
-        while wait_time > 0:
-            await asyncio.sleep(10)
-            wait_time -= 10
-            if wait_time > 0:
-                await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n⏳ 正在等待GitHub同步更新 ({wait_time}秒)...")
+        # 等待GitHub同步
+        message_template = f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n⏳ 正在等待GitHub同步更新 ({{wait_time}}秒)..."
+        await wait_for_github_sync(query, message_template)
 
         # 更新OpenClash规则
         await query.edit_message_text(f"✅ 成功！\n\n'{input_value}' 已添加到 {os.path.basename(file_path)} 并推送到仓库。\n\n🔄 正在更新OpenClash规则...")
