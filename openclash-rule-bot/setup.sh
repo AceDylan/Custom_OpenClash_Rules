@@ -91,6 +91,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")],
         [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
         [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
+        [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
         [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -126,6 +127,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "- 使用 /move 命令\n"
         "- 选择源规则文件并选择要移动的规则\n"
         "- 选择目标规则文件完成移动\n\n"
+        "🔄 *更新全部规则：*\n"
+        "- 点击更新全部规则按钮\n"
+        "- 机器人会依次刷新所有OpenClash规则\n\n"
         "📋 *支持的规则文件：*\n"
         "• 🤖 AI代理规则 (Custom_Proxy_AI.list)\n"
         "• 🏠 直连规则 (Custom_Direct_my.list)\n"
@@ -353,6 +357,54 @@ def extract_rules_from_file(file_path):
 
     return rules
 
+async def refresh_all_rules(query):
+    """刷新所有OpenClash规则"""
+    try:
+        await query.edit_message_text("⏳ 正在刷新所有OpenClash规则...")
+
+        # 获取仓库，确保是最新的
+        await get_repo()
+
+        # 创建结果消息
+        results = []
+
+        # 依次刷新每个规则
+        for file_key, file_path in RULE_FILES.items():
+            rule_name = RULE_FILE_NAMES[file_key]
+            update_message = await refresh_openclash_rule(file_path)
+            results.append(f"{rule_name}: {update_message}")
+
+            # 更新进度消息
+            progress_message = "⏳ 正在刷新所有OpenClash规则...\n\n"
+            progress_message += "\n".join(results)
+            await query.edit_message_text(progress_message)
+
+            # 稍微延迟，避免请求过快
+            await asyncio.sleep(1)
+
+        # 创建返回按钮
+        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # 显示完成消息
+        complete_message = "✅ 所有规则刷新完成！\n\n"
+        complete_message += "\n".join(results)
+
+        await query.edit_message_text(complete_message, reply_markup=reply_markup)
+
+    except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"刷新所有规则时发生错误: {str(e)}\n{error_details}")
+
+        # 创建返回按钮
+        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            f"❌ 刷新规则失败: {str(e)}\n详细错误请查看日志。",
+            reply_markup=reply_markup
+        )
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理按钮回调"""
     query = update.callback_query
@@ -396,6 +448,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text("↔️ 请选择源规则文件:", reply_markup=reply_markup)
             return
+        elif action == "refresh_all":
+            # 调用刷新所有规则的函数
+            await refresh_all_rules(query)
+            return
         elif action == "help":
             # 调用帮助命令逻辑
             keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
@@ -420,6 +476,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "- 使用 /move 命令\n"
                 "- 选择源规则文件并选择要移动的规则\n"
                 "- 选择目标规则文件完成移动\n\n"
+                "🔄 *更新全部规则：*\n"
+                "- 点击更新全部规则按钮\n"
+                "- 机器人会依次刷新所有OpenClash规则\n\n"
                 "📋 *支持的规则文件：*\n"
                 "• 🤖 AI代理规则 (Custom_Proxy_AI.list)\n"
                 "• 🏠 直连规则 (Custom_Direct_my.list)\n"
@@ -437,6 +496,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")],
                 [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
                 [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
+                [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
                 [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
