@@ -453,32 +453,47 @@ async def refresh_openclash_rule(file_path):
             before_update = await get_rule_info(rule_name)
             before_count = before_update.get('ruleCount', -1) if before_update else -1
             
-            # 调用更新接口
-            url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
-            headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+            # 更新成功标志
+            update_success = False
             
-            response = requests.put(url, headers=headers)
-            
-            if response.status_code == 204:
-                # 等待并检查是否更新成功
-                for attempt in range(max_retries):
-                    await asyncio.sleep(retry_delay)
-                    
-                    # 获取更新后的规则信息
-                    after_update = await get_rule_info(rule_name)
-                    after_count = after_update.get('ruleCount', -1) if after_update else -1
-                    
-                    # 只检查ruleCount是否发生变化，不检查更新时间
-                    if after_update and after_count != before_count:
-                        update_message = f"✅ 已成功刷新OpenClash规则: {rule_name} (规则数量: {after_count})"
-                        break
-                    
-                    # 最后一次尝试后仍未成功
-                    if attempt == max_retries - 1:
-                        update_message = f"⚠️ OpenClash规则已更新，但无法确认是否生效: {rule_name}"
+            # 进行多次尝试
+            for attempt in range(max_retries):
+                # 调用更新接口
+                url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
+                headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
                 
-            else:
-                update_message = f"❌ 刷新规则失败，状态码: {response.status_code}"
+                try:
+                    response = requests.put(url, headers=headers)
+                    
+                    if response.status_code != 204:
+                        # 如果API调用失败，记录错误并继续尝试
+                        logger.warning(f"第 {attempt+1} 次刷新规则失败，状态码: {response.status_code}")
+                        await asyncio.sleep(retry_delay)
+                        continue
+                except Exception as e:
+                    logger.warning(f"第 {attempt+1} 次刷新规则请求异常: {str(e)}")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                
+                # 等待一段时间让规则更新生效
+                await asyncio.sleep(retry_delay)
+                
+                # 获取更新后的规则信息
+                after_update = await get_rule_info(rule_name)
+                after_count = after_update.get('ruleCount', -1) if after_update else -1
+                
+                # 检查ruleCount是否发生变化
+                if after_update and after_count != before_count:
+                    update_message = f"✅ 已成功刷新OpenClash规则: {rule_name} (规则数量: {after_count})"
+                    update_success = True
+                    break
+                
+                # 如果还没成功，继续下一次尝试（会再次调用更新接口）
+                logger.info(f"第 {attempt+1} 次刷新尝试后，规则数量未变化，将重试...")
+            
+            # 如果所有尝试后仍未成功
+            if not update_success:
+                update_message = f"⚠️ 尝试了 {max_retries} 次更新后，OpenClash规则 {rule_name} 似乎未生效"
         else:
             update_message = "⚠️ 无法确定对应的OpenClash规则，未进行刷新"
     except Exception as e:
