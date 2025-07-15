@@ -259,6 +259,18 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     # 处理添加规则输入
     if user_id in user_states and user_states[user_id].get("action") == "add_waiting_input":
+        # 先判断输入类型并设置type字段
+        if is_valid_domain(user_input):
+            user_states[user_id]["type"] = "domain"
+            user_states[user_id]["input"] = user_input
+        elif is_valid_ip(user_input):
+            user_states[user_id]["type"] = "ip"
+            user_states[user_id]["input"] = user_input
+        else:
+            # 输入格式不正确
+            await update.message.reply_text("❌ 输入格式不正确，请输入有效的域名或IP地址。")
+            return
+        
         await add_rule_and_commit(update, user_states[user_id], user_input)
         return
 
