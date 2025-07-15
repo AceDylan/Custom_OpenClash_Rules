@@ -442,8 +442,8 @@ async def get_rule_info(rule_name):
 async def refresh_openclash_rule(file_path):
     """刷新OpenClash规则，使用新的API接口并验证更新"""
     update_message = ""
-    max_retries = 20  # 最大重试次数
-    retry_delay = 8  # 每次重试间隔秒数
+    max_retries = 30  # 最大重试次数
+    retry_delay = 10  # 每次重试间隔秒数
     
     try:
         if file_path in OPENCLASH_RULE_MAPPING:
@@ -468,9 +468,8 @@ async def refresh_openclash_rule(file_path):
                     after_update = await get_rule_info(rule_name)
                     after_count = after_update.get('ruleCount', -1) if after_update else -1
                     
-                    # 如果ruleCount发生变化或者更新时间有变化，认为更新成功
-                    if after_update and (after_count != before_count or 
-                                        (before_update and after_update.get('updatedAt') != before_update.get('updatedAt'))):
+                    # 只检查ruleCount是否发生变化，不检查更新时间
+                    if after_update and after_count != before_count:
                         update_message = f"✅ 已成功刷新OpenClash规则: {rule_name} (规则数量: {after_count})"
                         break
                     
@@ -528,7 +527,7 @@ def extract_rules_from_file(file_path):
     return rules
 
 async def refresh_all_rules(query):
-    """刷新所有OpenClash规则，使用新的简化逻辑"""
+    """刷新所有OpenClash规则，直接调用API不验证结果"""
     try:
         await query.edit_message_text("⏳ 正在刷新所有OpenClash规则...")
 
@@ -544,13 +543,25 @@ async def refresh_all_rules(query):
 
         # 依次刷新每个规则
         for file_key, file_path in RULE_FILES.items():
-            rule_name = RULE_FILE_NAMES[file_key]
-            
-            # 更新进度消息
-            await query.edit_message_text(f"⏳ 正在刷新规则: {rule_name}...")
-            
-            update_message = await refresh_openclash_rule(file_path)
-            results.append(f"{rule_name}: {update_message}")
+            if file_path in OPENCLASH_RULE_MAPPING:
+                rule_name = OPENCLASH_RULE_MAPPING[file_path]
+                display_name = RULE_FILE_NAMES[file_key]
+                
+                # 更新进度消息
+                await query.edit_message_text(f"⏳ 正在刷新规则: {display_name}...")
+                
+                # 直接调用API，不验证结果
+                url = f"{OPENCLASH_API_URL}/providers/rules/{rule_name}"
+                headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+                
+                try:
+                    response = requests.put(url, headers=headers)
+                    if response.status_code == 204:
+                        results.append(f"{display_name}: ✅ 已刷新")
+                    else:
+                        results.append(f"{display_name}: ❌ 刷新失败，状态码: {response.status_code}")
+                except Exception as e:
+                    results.append(f"{display_name}: ❌ 刷新失败，错误: {str(e)}")
 
             # 更新进度消息
             progress_message = "⏳ 正在刷新所有OpenClash规则...\n\n"
