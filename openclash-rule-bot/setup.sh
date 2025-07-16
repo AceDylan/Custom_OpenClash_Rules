@@ -135,7 +135,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             InlineKeyboardButton("🔍 搜索规则", callback_data="action:search"),
             InlineKeyboardButton("🔄 更新全部", callback_data="action:refresh_all")
         ],
-        [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
+        [
+            InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections"),
+            InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -181,7 +184,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• 🏠 直连规则 (Custom_Direct_my.list)\n"
         "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
         "• 📺 国外媒体代理规则 (Custom_Proxy_Media.list)\n"
-        "• 🔍 Google代理规则 (Custom_Proxy_Google.list)",
+        "• 🔍 Google代理规则 (Custom_Proxy_Google.list)\n\n"
+        "🧹 *清空连接：*\n"
+        "- 点击清空连接按钮\n"
+        "- 机器人会调用OpenClash API清空所有当前连接",
         parse_mode='Markdown'
     )
 
@@ -703,6 +709,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
                 [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
                 [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
+                [InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")],
                 [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -720,6 +727,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif action == "search":
             user_states[user_id] = {"action": "search_waiting"}
             await query.edit_message_text("🔍 请输入要搜索的域名或IP地址关键词：")
+            return
+        elif action == "clear_connections":
+            await clear_connections(query)
             return
 
     # 添加规则
@@ -1523,6 +1533,60 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_states[user_id] = {"action": "search_waiting"}
     
     await update.message.reply_text("🔍 请输入要搜索的域名或IP地址关键词:")
+
+async def clear_connections(query):
+    """清空当前所有连接"""
+    try:
+        await query.edit_message_text("⏳ 正在清空连接...")
+        
+        # 调用OpenClash API
+        url = f"{OPENCLASH_API_URL}/connections"
+        headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+        
+        try:
+            response = requests.delete(url, headers=headers)
+            
+            if response.status_code == 204:
+                # 创建返回按钮
+                keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    "✅ 已成功清空所有连接！",
+                    reply_markup=reply_markup
+                )
+            else:
+                # 创建返回按钮
+                keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    f"❌ 清空连接失败，状态码: {response.status_code}",
+                    reply_markup=reply_markup
+                )
+        except Exception as e:
+            # 创建返回按钮
+            keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            logger.error(f"清空连接时发生错误: {str(e)}")
+            await query.edit_message_text(
+                f"❌ 清空连接失败: {str(e)}",
+                reply_markup=reply_markup
+            )
+            
+    except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"清空连接时发生错误: {str(e)}\n{error_details}")
+        
+        # 创建返回按钮
+        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"❌ 操作失败: {str(e)}",
+            reply_markup=reply_markup
+        )
 
 async def handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYPE, search_term) -> None:
     """处理搜索输入并显示结果"""
