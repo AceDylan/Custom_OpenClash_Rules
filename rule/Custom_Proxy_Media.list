@@ -73,3 +73,6 @@ DOMAIN-SUFFIX,jetbrains.com
 
 # 添加域名 fastlydns.net
 DOMAIN-SUFFIX,fastlydns.net
+
+# 添加域名 ps.aside.top
+DOMAIN-SUFFIX,ps.aside.top
