@@ -22,3 +22,6 @@ DOMAIN-SUFFIX,samsung.com
 DOMAIN-SUFFIX,samsungapps.com
 
 
+
+# 添加域名 android.com
+DOMAIN-SUFFIX,android.com
