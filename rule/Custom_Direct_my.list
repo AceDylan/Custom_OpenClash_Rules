@@ -24,3 +24,6 @@ DOMAIN-SUFFIX,samsungapps.com
 # 添加域名 emby.date
 DOMAIN-SUFFIX,emby.date
 
+
+# 添加域名 emby.bid
+DOMAIN-SUFFIX,emby.bid
