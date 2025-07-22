@@ -76,3 +76,6 @@ DOMAIN-SUFFIX,fastlydns.net
 
 # 添加域名 ps.aside.top
 DOMAIN-SUFFIX,ps.aside.top
+
+# 添加域名 b.blackcatfilm.cc
+DOMAIN-SUFFIX,b.blackcatfilm.cc
