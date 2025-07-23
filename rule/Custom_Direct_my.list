@@ -29,3 +29,6 @@ DOMAIN-SUFFIX,emby.trade
 
 # 添加域名 v.jrc.ink
 DOMAIN-SUFFIX,v.jrc.ink
+
+# 添加域名 emby.bid
+DOMAIN-SUFFIX,emby.bid
