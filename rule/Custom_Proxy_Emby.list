@@ -24,3 +24,6 @@ DOMAIN-SUFFIX,xmsl.org
 
 # 添加域名 cflocal.xxlb.net
 DOMAIN-SUFFIX,cflocal.xxlb.net
+
+# 添加域名 vban.xyz
+DOMAIN-SUFFIX,vban.xyz
