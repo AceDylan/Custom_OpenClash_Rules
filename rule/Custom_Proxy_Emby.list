@@ -31,3 +31,6 @@ DOMAIN-SUFFIX,vban.xyz
 
 # 添加域名 emby.bid
 DOMAIN-SUFFIX,emby.bid
+
+# 添加域名 gyplay.xxlb.net
+DOMAIN-SUFFIX,gyplay.xxlb.net
