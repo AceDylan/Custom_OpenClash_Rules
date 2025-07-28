@@ -77,7 +77,8 @@ RULE_FILES = {
     "direct": "rule/Custom_Direct_my.list",
     "emby": "rule/Custom_Proxy_Emby.list",
     "media": "rule/Custom_Proxy_Media.list",
-    "google": "rule/Custom_Proxy_Google.list"
+    "google": "rule/Custom_Proxy_Google.list",
+    "blackcat": "rule/Custom_Proxy_Emby_BlackCat.list"
 }
 
 # 规则文件与OpenClash规则名称映射
@@ -86,7 +87,8 @@ OPENCLASH_RULE_MAPPING = {
     "rule/Custom_Direct_my.list": "Custom_Direct_my",
     "rule/Custom_Proxy_Emby.list": "Custom_Proxy_Emby",
     "rule/Custom_Proxy_Media.list": "Custom_Proxy_Media",
-    "rule/Custom_Proxy_Google.list": "Custom_Proxy_Google"
+    "rule/Custom_Proxy_Google.list": "Custom_Proxy_Google",
+    "rule/Custom_Proxy_Emby_BlackCat.list": "Custom_Proxy_Emby_BlackCat"
 }
 
 # 规则文件对应的显示名称
@@ -95,7 +97,8 @@ RULE_FILE_NAMES = {
     "direct": "🏠 直连规则",
     "emby": "🎬 Emby代理规则",
     "media": "📺 国外媒体代理规则",
-    "google": "🔍 Google代理规则"
+    "google": "🔍 Google代理规则",
+    "blackcat": "🐈‍⬛ 黑猫Emby规则"
 }
 
 # 用户状态存储
@@ -184,7 +187,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• 🏠 直连规则 (Custom_Direct_my.list)\n"
         "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
         "• 📺 国外媒体代理规则 (Custom_Proxy_Media.list)\n"
-        "• 🔍 Google代理规则 (Custom_Proxy_Google.list)\n\n"
+        "• 🔍 Google代理规则 (Custom_Proxy_Google.list)\n"
+        "• 🐈‍⬛ 黑猫Emby规则 (Custom_Proxy_Emby_BlackCat.list)\n\n"
         "🧹 *清空连接：*\n"
         "- 点击清空连接按钮\n"
         "- 机器人会调用OpenClash API清空所有当前连接",
@@ -696,7 +700,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "• 🏠 直连规则 (Custom_Direct_my.list)\n"
                 "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
                 "• 📺 国外媒体代理规则 (Custom_Proxy_Media.list)\n"
-                "• 🔍 Google代理规则 (Custom_Proxy_Google.list)",
+                "• 🔍 Google代理规则 (Custom_Proxy_Google.list)\n"
+                "• 🐈‍⬛ 黑猫Emby规则 (Custom_Proxy_Emby_BlackCat.list)",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
