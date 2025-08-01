@@ -1,2 +1,5 @@
 # 添加域名 emby.date
 DOMAIN-SUFFIX,emby.date
+
+# 添加域名 emby.trade
+DOMAIN-SUFFIX,emby.trade
