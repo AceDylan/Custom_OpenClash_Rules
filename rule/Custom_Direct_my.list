@@ -26,3 +26,6 @@ DOMAIN-SUFFIX,emby.bid
 
 # 添加域名 jrctv.us
 DOMAIN-SUFFIX,jrctv.us
+
+# 添加域名 8.emby.date
+DOMAIN-SUFFIX,8.emby.date
