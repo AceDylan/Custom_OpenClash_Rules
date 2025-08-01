@@ -6,3 +6,6 @@ DOMAIN-SUFFIX,emby.trade
 
 # 添加IP 158.180.26.4
 IP-CIDR,158.180.26.4/32,no-resolve
+
+# 添加域名 fr.emby.date
+DOMAIN-SUFFIX,fr.emby.date
