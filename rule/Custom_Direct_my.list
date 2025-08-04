@@ -35,3 +35,6 @@ IP-CIDR,43.139.184.65/32,no-resolve
 
 # 添加域名 pro.204cloud.com
 DOMAIN-SUFFIX,pro.204cloud.com
+
+# 添加域名 alphatvx.alphatvapp.top
+DOMAIN-SUFFIX,alphatvx.alphatvapp.top
