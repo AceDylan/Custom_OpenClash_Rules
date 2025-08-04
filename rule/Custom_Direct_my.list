@@ -36,3 +36,6 @@ IP-CIDR,43.139.184.65/32,no-resolve
 # 添加域名 pro.204cloud.com
 DOMAIN-SUFFIX,pro.204cloud.com
 
+
+# 添加IP 202.189.5.63
+IP-CIDR,202.189.5.63/32,no-resolve
