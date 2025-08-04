@@ -29,3 +29,6 @@ DOMAIN-SUFFIX,jrctv.us
 
 # 添加域名 8.emby.date
 DOMAIN-SUFFIX,8.emby.date
+
+# 添加IP 43.139.184.65
+IP-CIDR,43.139.184.65/32,no-resolve
