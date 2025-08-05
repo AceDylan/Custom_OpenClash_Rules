@@ -24,8 +24,9 @@ DOMAIN-SUFFIX,v.jrc.ink
 # 添加域名 sgx.emby.bid
 DOMAIN-SUFFIX,sgx.emby.bid
 
-# 添加域名 jrctv.us
+# 添加域名 v.jrc.ink
 DOMAIN-SUFFIX,jrctv.us
+DOMAIN-SUFFIX,v.jrc.ink
 
 # 添加域名 8.emby.date
 DOMAIN-SUFFIX,8.emby.date
@@ -36,6 +37,35 @@ IP-CIDR,43.139.184.65/32,no-resolve
 # 添加域名 pro.204cloud.com
 DOMAIN-SUFFIX,pro.204cloud.com
 
+DOMAIN-SUFFIX,linux.do
+DOMAIN-SUFFIX,unpkg.com
+DOMAIN-SUFFIX,yesicon.app
+DOMAIN-SUFFIX,strongme.app
+
+# 添加域名 appinn.me
+DOMAIN-SUFFIX,appinn.me
+
+# 添加域名 appinn.net
+DOMAIN-SUFFIX,appinn.net
 
 # 添加IP 202.189.5.63
 IP-CIDR,202.189.5.63/32,no-resolve
+
+# 添加域名 seedhub.cc
+DOMAIN-SUFFIX,seedhub.cc
+
+# 添加域名 salesmartly.com
+DOMAIN-SUFFIX,salesmartly.com
+
+# 添加域名 remove.bg
+DOMAIN-SUFFIX,remove.bg
+
+# 添加域名 selenium.dev
+DOMAIN-SUFFIX,selenium.dev
+
+# 添加域名 jetbrains.com
+DOMAIN-SUFFIX,jetbrains.com
+
+# 添加域名 pypi.org
+DOMAIN-SUFFIX,pypi.org
+

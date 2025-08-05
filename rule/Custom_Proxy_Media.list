@@ -15,61 +15,18 @@ DOMAIN-SUFFIX,amazonaws.com
 # 其他
 DOMAIN-SUFFIX,jianpiancloud.com
 DOMAIN-SUFFIX,loli.net
-DOMAIN-SUFFIX,unpkg.com
-DOMAIN-SUFFIX,linux.do
 DOMAIN-SUFFIX,mooguu.org
 DOMAIN-SUFFIX,yandex.net
 DOMAIN-SUFFIX,yandex.ru
 DOMAIN-SUFFIX,ya.ru
 DOMAIN-SUFFIX,yandex.com
 DOMAIN-SUFFIX,yastatic.net
-# 添加域名 yesicon.app
-DOMAIN-SUFFIX,yesicon.app
-
-# 添加域名 strongme.app
-DOMAIN-SUFFIX,strongme.app
-
-# 添加域名 appinn.me
-DOMAIN-SUFFIX,appinn.me
-
-# 添加域名 appinn.net
-DOMAIN-SUFFIX,appinn.net
 
 # 添加域名 alphatvapp.top
 DOMAIN-SUFFIX,alphatvapp.top
 
-# 添加域名 javmost.com
-DOMAIN-SUFFIX,javmost.com
-
-# 添加域名 75kp.com
-DOMAIN-SUFFIX,75kp.com
-
-# 添加域名 javday.app
-DOMAIN-SUFFIX,javday.app
-
-# 添加域名 madouclub.one
-DOMAIN-SUFFIX,madouclub.one
-
-# 添加域名 seedhub.cc
-DOMAIN-SUFFIX,seedhub.cc
-
-# 添加域名 salesmartly.com
-DOMAIN-SUFFIX,salesmartly.com
-
-# 添加域名 remove.bg
-DOMAIN-SUFFIX,remove.bg
-
-# 添加域名 selenium.dev
-DOMAIN-SUFFIX,selenium.dev
-
 # 添加域名 hdhive.online
 DOMAIN-SUFFIX,hdhive.online
-
-# 添加域名 pypi.org
-DOMAIN-SUFFIX,pypi.org
-
-# 添加域名 jetbrains.com
-DOMAIN-SUFFIX,jetbrains.com
 
 # 添加域名 fastlydns.net
 DOMAIN-SUFFIX,fastlydns.net
