@@ -15,3 +15,6 @@ DOMAIN-SUFFIX,amazonaws.com
 
 # 添加域名 b.blackcatfilm.cc
 DOMAIN-SUFFIX,b.blackcatfilm.cc
+
+# 添加域名 cloudflare.com
+DOMAIN-SUFFIX,cloudflare.com
