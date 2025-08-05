@@ -13,8 +13,5 @@ DOMAIN-SUFFIX,hdhive.online
 DOMAIN-SUFFIX,amazon.com
 DOMAIN-SUFFIX,amazonaws.com
 
-# 添加域名 alphatvapp.top
-DOMAIN-SUFFIX,alphatvapp.top
-
 # 添加域名 b.blackcatfilm.cc
 DOMAIN-SUFFIX,b.blackcatfilm.cc
