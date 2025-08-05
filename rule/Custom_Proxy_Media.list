@@ -7,31 +7,14 @@ DOMAIN-SUFFIX,maosu.vip
 
 # 影巢
 DOMAIN-SUFFIX,hdhive.com
+DOMAIN-SUFFIX,hdhive.online
 
 # AWS
 DOMAIN-SUFFIX,amazon.com
 DOMAIN-SUFFIX,amazonaws.com
 
-# 其他
-DOMAIN-SUFFIX,jianpiancloud.com
-DOMAIN-SUFFIX,loli.net
-DOMAIN-SUFFIX,mooguu.org
-DOMAIN-SUFFIX,yandex.net
-DOMAIN-SUFFIX,yandex.ru
-DOMAIN-SUFFIX,ya.ru
-DOMAIN-SUFFIX,yandex.com
-DOMAIN-SUFFIX,yastatic.net
-
 # 添加域名 alphatvapp.top
 DOMAIN-SUFFIX,alphatvapp.top
 
-# 添加域名 hdhive.online
-DOMAIN-SUFFIX,hdhive.online
-
-# 添加域名 fastlydns.net
-DOMAIN-SUFFIX,fastlydns.net
-
-
 # 添加域名 b.blackcatfilm.cc
 DOMAIN-SUFFIX,b.blackcatfilm.cc
-
