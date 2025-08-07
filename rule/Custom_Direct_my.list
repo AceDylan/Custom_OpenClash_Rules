@@ -74,3 +74,6 @@ DOMAIN-SUFFIX,sage-modi.com
 
 # 添加域名 mail.tm
 DOMAIN-SUFFIX,mail.tm
+
+# 添加域名 mail.td
+DOMAIN-SUFFIX,mail.td
