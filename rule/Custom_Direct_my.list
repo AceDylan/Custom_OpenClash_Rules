@@ -68,3 +68,6 @@ DOMAIN-SUFFIX,jetbrains.com
 
 # 添加域名 pypi.org
 DOMAIN-SUFFIX,pypi.org
+
+# 添加域名 sage-modi.com
+DOMAIN-SUFFIX,sage-modi.com
