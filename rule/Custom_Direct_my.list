@@ -71,3 +71,6 @@ DOMAIN-SUFFIX,pypi.org
 
 # 添加域名 sage-modi.com
 DOMAIN-SUFFIX,sage-modi.com
+
+# 添加域名 mail.tm
+DOMAIN-SUFFIX,mail.tm
