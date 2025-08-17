@@ -18,3 +18,6 @@ DOMAIN-SUFFIX,b.blackcatfilm.cc
 
 # 添加域名 cloudflare.com
 DOMAIN-SUFFIX,cloudflare.com
+
+# 添加IP 107.174.176.176
+IP-CIDR,107.174.176.176/32,no-resolve
