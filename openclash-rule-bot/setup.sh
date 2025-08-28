@@ -421,7 +421,16 @@ async def get_repo():
                 repo.create_head('main', origin.refs.main)
                 repo.heads.main.set_tracking_branch(origin.refs.main)
                 repo.heads.main.checkout()
-                origin.pull()
+                # 修改这里的 pull 调用
+                try:
+                    origin.pull()
+                except git.exc.GitCommandError as e:
+                    if "Need to specify how to reconcile divergent branches" in str(e):
+                        logger.warning("检测到分支分歧，强制重置到远程分支")
+                        origin.fetch()
+                        repo.git.reset('--hard', 'origin/main')
+                    else:
+                        raise e
         else:
             # 确保父目录存在
             os.makedirs(os.path.dirname(REPO_PATH), exist_ok=True)
@@ -429,7 +438,27 @@ async def get_repo():
     else:
         repo = git.Repo(REPO_PATH)
         origin = repo.remotes.origin
-        origin.pull()
+        
+        # 修改这里的 pull 调用，添加错误处理
+        try:
+            origin.pull()
+        except git.exc.GitCommandError as e:
+            if "Need to specify how to reconcile divergent branches" in str(e):
+                logger.warning("检测到分支分歧，尝试不同的合并策略")
+                try:
+                    # 方法1: 尝试使用 rebase
+                    logger.info("尝试使用 rebase 策略")
+                    origin.pull(rebase=True)
+                except git.exc.GitCommandError:
+                    # 方法2: 如果 rebase 失败，强制重置到远程分支
+                    logger.warning("rebase 失败，强制重置到远程分支")
+                    origin.fetch()
+                    # 获取当前分支名
+                    current_branch = repo.active_branch.name
+                    repo.git.reset('--hard', f'origin/{current_branch}')
+            else:
+                # 其他 Git 错误，重新抛出
+                raise e
 
     return repo
 
