@@ -1737,7 +1737,7 @@ COPY bot.py /app/
 COPY requirements.txt /app/
 
 RUN apt-get update && \
-    apt-get install -y git dbus policykit-1 && \
+    apt-get install -y git dbus polkitd pkexec && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
