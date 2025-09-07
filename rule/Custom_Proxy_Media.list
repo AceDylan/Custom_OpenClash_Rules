@@ -23,3 +23,6 @@ DOMAIN-SUFFIX,cloudflare.com
 IP-CIDR,107.174.176.176/32,no-resolve
 
 
+
+# 添加域名 www.afusekt.cn
+DOMAIN-SUFFIX,www.afusekt.cn
