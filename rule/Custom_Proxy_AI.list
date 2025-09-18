@@ -12,3 +12,6 @@ DOMAIN-SUFFIX,monica.cool
 
 # 添加域名 monica-cdn.im
 DOMAIN-SUFFIX,monica-cdn.im
+
+# 添加域名 manus.im
+DOMAIN-SUFFIX,manus.im
