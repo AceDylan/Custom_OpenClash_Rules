@@ -45,3 +45,6 @@ DOMAIN-SUFFIX,nure2.emby.bid
 
 # 添加IP 107.181.238.190
 IP-CIDR,107.181.238.190/32,no-resolve
+
+# 添加域名 hk.emby.bid
+DOMAIN-SUFFIX,hk.emby.bid
