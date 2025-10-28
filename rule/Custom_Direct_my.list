@@ -82,5 +82,3 @@ DOMAIN-SUFFIX,www.afusekt.cn
 # 添加IP 103.120.89.208
 IP-CIDR,103.120.89.208/32,no-resolve
 
-# 添加IP 107.181.238.190
-IP-CIDR,107.181.238.190/32,no-resolve
