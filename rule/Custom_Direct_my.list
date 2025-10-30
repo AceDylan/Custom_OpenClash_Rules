@@ -85,3 +85,6 @@ IP-CIDR,103.120.89.208/32,no-resolve
 
 # 添加域名 music.204cloud.com
 DOMAIN-SUFFIX,music.204cloud.com
+
+# 添加域名 abs.204cloud.com
+DOMAIN-SUFFIX,abs.204cloud.com
