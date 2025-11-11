@@ -2,3 +2,6 @@
 DOMAIN-SUFFIX,googleapis.cn
 DOMAIN-SUFFIX,xn--ngstr-lra8j.com
 
+
+# 添加域名 gstatic.com
+DOMAIN-SUFFIX,gstatic.com
