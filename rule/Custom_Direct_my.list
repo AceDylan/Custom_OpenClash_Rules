@@ -33,7 +33,6 @@ IP-CIDR,43.139.184.65/32,no-resolve
 # 添加域名 pro.204cloud.com
 DOMAIN-SUFFIX,pro.204cloud.com
 
-DOMAIN-SUFFIX,linux.do
 DOMAIN-SUFFIX,unpkg.com
 DOMAIN-SUFFIX,yesicon.app
 DOMAIN-SUFFIX,strongme.app
