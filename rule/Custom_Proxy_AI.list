@@ -15,3 +15,6 @@ DOMAIN-SUFFIX,monica-cdn.im
 
 # 添加域名 manus.im
 DOMAIN-SUFFIX,manus.im
+
+# 添加域名 ai.megallm.io
+DOMAIN-SUFFIX,ai.megallm.io
