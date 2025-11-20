@@ -87,3 +87,6 @@ DOMAIN-SUFFIX,music.204cloud.com
 
 # 添加域名 abs.204cloud.com
 DOMAIN-SUFFIX,abs.204cloud.com
+
+# 添加域名 88code.org
+DOMAIN-SUFFIX,88code.org
