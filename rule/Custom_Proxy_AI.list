@@ -19,3 +19,6 @@ DOMAIN-SUFFIX,manus.im
 # 添加域名 ai.megallm.io
 DOMAIN-SUFFIX,ai.megallm.io
 
+
+# 添加域名 88code.org
+DOMAIN-SUFFIX,88code.org
