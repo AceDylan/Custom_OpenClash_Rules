@@ -88,3 +88,6 @@ DOMAIN-SUFFIX,music.204cloud.com
 # 添加域名 abs.204cloud.com
 DOMAIN-SUFFIX,abs.204cloud.com
 
+
+# 添加域名 privnode.com
+DOMAIN-SUFFIX,privnode.com
