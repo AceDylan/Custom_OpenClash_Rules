@@ -22,3 +22,6 @@ DOMAIN-SUFFIX,ai.megallm.io
 
 # 添加域名 88code.org
 DOMAIN-SUFFIX,88code.org
+
+# 添加域名 privnode.com
+DOMAIN-SUFFIX,privnode.com
