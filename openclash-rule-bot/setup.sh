@@ -2001,7 +2001,7 @@ fi
 
 # 生成 docker-compose.yml，根据是否有 GO_SHARE_DIR 决定挂载方式
 if [ -n "${GO_SHARE_DIR}" ]; then
-    # OpenWrt 模式：同时挂载 lib 和 share 目录
+    # OpenWrt 模式：挂载整个 /usr/lib 和 /usr/share 以保持软链接完整
     cat > docker-compose.yml << EOF
 services:
   telegram-bot:
@@ -2012,12 +2012,13 @@ services:
     volumes:
       - ./repo:/app/repo
       - /root/clash-speedtest:/root/clash-speedtest
-      - ${GO_ROOT}:/usr/local/go:ro
-      - ${GO_SHARE_DIR}:/usr/share/go-1.23:ro
+      - /usr/lib:/usr/lib:ro
+      - /usr/share:/usr/share:ro
       - /root/go:/root/go
     environment:
       - TZ=Asia/Shanghai
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${GO_ROOT}/bin
+      - GOROOT=${GO_ROOT}
       - GOPATH=/root/go
       - GOPROXY=https://goproxy.cn,direct
 EOF
