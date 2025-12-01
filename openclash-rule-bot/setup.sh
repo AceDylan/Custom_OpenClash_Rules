@@ -1947,7 +1947,7 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
-# 安装 Go 环境（自动检测架构并下载对应版本）
+# 安装 Go 环境（自动检测架构并下载对应版本，跳过 SSL 验证以应对系统时间不同步）
 RUN set -e && \
     GO_VERSION="1.23.4" && \
     ARCH=$(dpkg --print-architecture) && \
@@ -1959,9 +1959,9 @@ RUN set -e && \
     esac && \
     GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
     echo "Downloading Go ${GO_VERSION} for ${GO_ARCH}..." && \
-    (curl -fSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
+    (curl -fSLk --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
         "https://go.dev/dl/${GO_TAR}" -o "${GO_TAR}" || \
-     curl -fSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
+     curl -fSLk --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
         "https://golang.google.cn/dl/${GO_TAR}" -o "${GO_TAR}") && \
     echo "Extracting Go..." && \
     tar -C /usr/local -xzf "${GO_TAR}" && \
