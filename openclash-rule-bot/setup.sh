@@ -1972,7 +1972,58 @@ echo "  版本: ${GO_VERSION}"
 echo "  GOROOT: ${GO_ROOT}"
 echo "  Go 可执行文件: ${GO_BIN_PATH}"
 
-cat > docker-compose.yml << EOF
+# 检查 GOROOT 是否包含 bin/go
+if [ ! -f "${GO_ROOT}/bin/go" ]; then
+    echo "警告：${GO_ROOT}/bin/go 不存在"
+    echo "尝试使用 go 命令的父目录..."
+    GO_BIN_DIR=$(dirname "${GO_BIN_PATH}")
+    GO_ROOT_ALT=$(dirname "${GO_BIN_DIR}")
+    if [ -f "${GO_ROOT_ALT}/bin/go" ]; then
+        GO_ROOT="${GO_ROOT_ALT}"
+        echo "✓ 使用替代 GOROOT: ${GO_ROOT}"
+    else
+        echo "错误：无法找到完整的 Go 安装目录"
+        echo "请检查 Go 安装是否完整"
+    fi
+fi
+
+# 检测 Go 是否使用了软链接到 /usr/share（OpenWrt 特有）
+GO_SHARE_DIR=""
+if [ -L "${GO_ROOT}/src" ]; then
+    # src 是软链接，检查是否指向 /usr/share
+    SRC_TARGET=$(readlink -f "${GO_ROOT}/src")
+    if echo "${SRC_TARGET}" | grep -q "/usr/share/go"; then
+        # 提取 share 目录路径
+        GO_SHARE_DIR=$(echo "${SRC_TARGET}" | sed 's|/src$||')
+        echo "✓ 检测到 Go 使用软链接: ${GO_SHARE_DIR}"
+    fi
+fi
+
+# 生成 docker-compose.yml，根据是否有 GO_SHARE_DIR 决定挂载方式
+if [ -n "${GO_SHARE_DIR}" ]; then
+    # OpenWrt 模式：同时挂载 lib 和 share 目录
+    cat > docker-compose.yml << EOF
+services:
+  telegram-bot:
+    build: .
+    container_name: openclash-rule-bot
+    restart: always
+    network_mode: "host"
+    volumes:
+      - ./repo:/app/repo
+      - /root/clash-speedtest:/root/clash-speedtest
+      - ${GO_ROOT}:/usr/local/go:ro
+      - ${GO_SHARE_DIR}:/usr/share/go-1.23:ro
+      - /root/go:/root/go
+    environment:
+      - TZ=Asia/Shanghai
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin
+      - GOPATH=/root/go
+      - GOPROXY=https://goproxy.cn,direct
+EOF
+else
+    # 标准模式：只挂载 GOROOT
+    cat > docker-compose.yml << EOF
 services:
   telegram-bot:
     build: .
@@ -1990,6 +2041,7 @@ services:
       - GOPATH=/root/go
       - GOPROXY=https://goproxy.cn,direct
 EOF
+fi
 
 # 创建repo目录
 mkdir -p repo
