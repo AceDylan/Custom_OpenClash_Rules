@@ -659,7 +659,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     user_id = update.effective_user.id
-    if user_id not in user_states and not query.data.startswith("action:"):
+    if user_id not in user_states and not query.data.startswith("action:") and not query.data.startswith("youtube_unlock:"):
         await query.edit_message_text("⏱️ 会话已过期，请重新开始。")
         return
 
