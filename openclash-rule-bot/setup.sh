@@ -1935,96 +1935,56 @@ FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
+# 定义 Go 版本
+ARG GO_VERSION=1.23.4
+
 COPY bot.py /app/
 COPY requirements.txt /app/
 
-# 安装依赖（忽略仓库过期检查，适用于系统时间不同步的情况）
+# 安装依赖和 Go（忽略仓库过期检查，适用于系统时间不同步的情况）
+# Go 必须在容器内安装，不能从宿主机挂载（因为 OpenWrt 使用 musl libc，而容器使用 glibc）
 RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y git dbus polkitd pkexec ca-certificates && \
+    apt-get install -y git dbus polkitd pkexec ca-certificates curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p /app/repo && \
-    chmod -R 777 /app/repo
+    chmod -R 777 /app/repo && \
+    # 安装 Go（根据架构自动选择）
+    ARCH=$(dpkg --print-architecture) && \
+    case ${ARCH} in \
+        amd64) GOARCH="amd64" ;; \
+        arm64) GOARCH="arm64" ;; \
+        armhf) GOARCH="armv6l" ;; \
+        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac && \
+    curl -fsSL "https://golang.org/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" -o /tmp/go.tar.gz && \
+    tar -C /usr/local -xzf /tmp/go.tar.gz && \
+    rm /tmp/go.tar.gz
 
-# Go 环境从宿主机挂载（见 docker-compose.yml）
+# Go 环境变量
 ENV PATH=$PATH:/usr/local/go/bin
+ENV GOROOT=/usr/local/go
 ENV GOPATH=/root/go
 ENV GOPROXY=https://goproxy.cn,direct
 
 CMD ["python", "bot.py"]
 EOF
 
-# 检测宿主机 Go 环境（在生成 docker-compose.yml 前执行）
+# 检测宿主机 Go 环境（仅用于信息显示，不再必需）
 echo "正在检测宿主机 Go 环境..."
-if ! command -v go >/dev/null 2>&1; then
-    echo "错误：未在宿主机上找到 Go 命令"
-    echo "请先在 OpenWrt 上安装 Go 或使用其他部署方式"
-    exit 1
-fi
-
-GO_BIN_PATH=$(which go)
-GO_ROOT=$(go env GOROOT)
-GO_VERSION=$(go version)
-
-echo "✓ 检测到 Go 环境："
-echo "  版本: ${GO_VERSION}"
-echo "  GOROOT: ${GO_ROOT}"
-echo "  Go 可执行文件: ${GO_BIN_PATH}"
-
-# 检查 GOROOT 是否包含 bin/go
-if [ ! -f "${GO_ROOT}/bin/go" ]; then
-    echo "警告：${GO_ROOT}/bin/go 不存在"
-    echo "尝试使用 go 命令的父目录..."
-    GO_BIN_DIR=$(dirname "${GO_BIN_PATH}")
-    GO_ROOT_ALT=$(dirname "${GO_BIN_DIR}")
-    if [ -f "${GO_ROOT_ALT}/bin/go" ]; then
-        GO_ROOT="${GO_ROOT_ALT}"
-        echo "✓ 使用替代 GOROOT: ${GO_ROOT}"
-    else
-        echo "错误：无法找到完整的 Go 安装目录"
-        echo "请检查 Go 安装是否完整"
-    fi
-fi
-
-# 检测 Go 是否使用了软链接到 /usr/share（OpenWrt 特有）
-GO_SHARE_DIR=""
-if [ -L "${GO_ROOT}/src" ]; then
-    # src 是软链接，检查是否指向 /usr/share
-    SRC_TARGET=$(readlink -f "${GO_ROOT}/src")
-    if echo "${SRC_TARGET}" | grep -q "/usr/share/go"; then
-        # 提取 share 目录路径
-        GO_SHARE_DIR=$(echo "${SRC_TARGET}" | sed 's|/src$||')
-        echo "✓ 检测到 Go 使用软链接: ${GO_SHARE_DIR}"
-    fi
-fi
-
-# 生成 docker-compose.yml，根据是否有 GO_SHARE_DIR 决定挂载方式
-if [ -n "${GO_SHARE_DIR}" ]; then
-    # OpenWrt 模式：保持相同路径挂载，让软链接的相对路径正确解析
-    cat > docker-compose.yml << EOF
-services:
-  telegram-bot:
-    build: .
-    container_name: openclash-rule-bot
-    restart: always
-    network_mode: "host"
-    volumes:
-      - ./repo:/app/repo
-      - /root/clash-speedtest:/root/clash-speedtest
-      - ${GO_ROOT}:${GO_ROOT}:ro
-      - ${GO_SHARE_DIR}:${GO_SHARE_DIR}:ro
-      - /root/go:/root/go
-    environment:
-      - TZ=Asia/Shanghai
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${GO_ROOT}/bin
-      - GOROOT=${GO_ROOT}
-      - GOPATH=/root/go
-      - GOPROXY=https://goproxy.cn,direct
-EOF
+if command -v go >/dev/null 2>&1; then
+    GO_VERSION=$(go version)
+    echo "✓ 检测到宿主机 Go 环境: ${GO_VERSION}"
+    echo "  注意：容器内将使用独立安装的 Go，不依赖宿主机"
 else
-    # 标准模式：只挂载 GOROOT
-    cat > docker-compose.yml << EOF
+    echo "ℹ 宿主机未安装 Go（这是正常的，容器内会自动安装 Go）"
+fi
+
+# 生成 docker-compose.yml
+# Go 已在 Dockerfile 中安装，无需从宿主机挂载
+# 仅挂载 GOPATH 用于缓存 Go 模块
+cat > docker-compose.yml << 'EOF'
 services:
   telegram-bot:
     build: .
@@ -2034,15 +1994,10 @@ services:
     volumes:
       - ./repo:/app/repo
       - /root/clash-speedtest:/root/clash-speedtest
-      - ${GO_ROOT}:/usr/local/go:ro
       - /root/go:/root/go
     environment:
       - TZ=Asia/Shanghai
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin
-      - GOPATH=/root/go
-      - GOPROXY=https://goproxy.cn,direct
 EOF
-fi
 
 # 创建repo目录
 mkdir -p repo
