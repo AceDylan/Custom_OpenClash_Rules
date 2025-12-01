@@ -1935,32 +1935,22 @@ FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# 定义 Go 版本
-ARG GO_VERSION=1.23.4
-
 COPY bot.py /app/
 COPY requirements.txt /app/
 
-# 安装依赖和 Go（忽略仓库过期检查，适用于系统时间不同步的情况）
-# Go 必须在容器内安装，不能从宿主机挂载（因为 OpenWrt 使用 musl libc，而容器使用 glibc）
+# 安装依赖（忽略仓库过期检查，适用于系统时间不同步的情况）
 RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y git dbus polkitd pkexec ca-certificates curl && \
+    apt-get install -y git dbus polkitd pkexec ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p /app/repo && \
-    chmod -R 777 /app/repo && \
-    # 安装 Go（根据架构自动选择）
-    ARCH=$(dpkg --print-architecture) && \
-    case ${ARCH} in \
-        amd64) GOARCH="amd64" ;; \
-        arm64) GOARCH="arm64" ;; \
-        armhf) GOARCH="armv6l" ;; \
-        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-    esac && \
-    curl -fsSL "https://golang.google.cn/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" -o /tmp/go.tar.gz && \
-    tar -C /usr/local -xzf /tmp/go.tar.gz && \
-    rm /tmp/go.tar.gz
+    chmod -R 777 /app/repo
+
+# 安装 Go（从本地文件，避免网络问题）
+# Go 必须在容器内安装，不能从宿主机挂载（因为 OpenWrt 使用 musl libc，而容器使用 glibc）
+COPY go.tar.gz /tmp/go.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz
 
 # Go 环境变量
 ENV PATH=$PATH:/usr/local/go/bin
@@ -1971,15 +1961,36 @@ ENV GOPROXY=https://goproxy.cn,direct
 CMD ["python", "bot.py"]
 EOF
 
-# 检测宿主机 Go 环境（仅用于信息显示，不再必需）
-echo "正在检测宿主机 Go 环境..."
-if command -v go >/dev/null 2>&1; then
-    GO_VERSION=$(go version)
-    echo "✓ 检测到宿主机 Go 环境: ${GO_VERSION}"
-    echo "  注意：容器内将使用独立安装的 Go，不依赖宿主机"
-else
-    echo "ℹ 宿主机未安装 Go（这是正常的，容器内会自动安装 Go）"
+# 检查 Go 安装包是否存在
+if [ ! -f "go.tar.gz" ]; then
+    # 检测架构
+    ARCH=$(uname -m)
+    case ${ARCH} in
+        x86_64) GOARCH="amd64" ;;
+        aarch64) GOARCH="arm64" ;;
+        armv7l) GOARCH="armv6l" ;;
+        *) GOARCH="amd64" ;;
+    esac
+
+    echo "=========================================="
+    echo "❌ 缺少 Go 安装包 (go.tar.gz)"
+    echo ""
+    echo "请手动下载 Go 并放到当前目录："
+    echo ""
+    echo "下载地址（选择一个）："
+    echo "  官方: https://go.dev/dl/"
+    echo "  中国镜像: https://golang.google.cn/dl/"
+    echo ""
+    echo "推荐版本: go1.23.4.linux-${GOARCH}.tar.gz"
+    echo ""
+    echo "下载后重命名为 go.tar.gz 放到此目录："
+    echo "  mv go1.23.4.linux-${GOARCH}.tar.gz go.tar.gz"
+    echo ""
+    echo "然后重新运行此脚本"
+    echo "=========================================="
+    exit 1
 fi
+echo "✓ 检测到 Go 安装包: go.tar.gz"
 
 # 生成 docker-compose.yml
 # Go 已在 Dockerfile 中安装，无需从宿主机挂载
