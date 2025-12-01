@@ -1690,6 +1690,8 @@ async def run_youtube_unlock_test(query, provider):
         work_dir = "/root/clash-speedtest"
         cmd = ["go", "run", "youtube-check.go", "-c", url]
         
+        logger.info(f"开始执行油管解锁测试: provider={provider}, cmd={cmd}, work_dir={work_dir}")
+        
         try:
             # 运行命令，设置超时时间为10分钟
             process = await asyncio.create_subprocess_exec(
@@ -1699,13 +1701,23 @@ async def run_youtube_unlock_test(query, provider):
                 stderr=asyncio.subprocess.PIPE
             )
             
+            logger.info(f"进程已创建，等待执行完成...")
+            
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(),
-                timeout=600  # 10分钟超时
+                timeout=1800  # 30分钟超时
             )
             
+            stdout_text = stdout.decode('utf-8', errors='ignore') if stdout else ""
+            stderr_text = stderr.decode('utf-8', errors='ignore') if stderr else ""
+            
+            logger.info(f"命令执行完成: returncode={process.returncode}")
+            logger.info(f"命令输出 stdout:\n{stdout_text[:2000]}")
+            if stderr_text:
+                logger.info(f"命令输出 stderr:\n{stderr_text[:2000]}")
+            
             if process.returncode != 0:
-                error_msg = stderr.decode('utf-8', errors='ignore') if stderr else "未知错误"
+                error_msg = stderr_text if stderr_text else "未知错误"
                 logger.error(f"油管解锁测试命令执行失败: {error_msg}")
                 
                 keyboard = [
@@ -1733,7 +1745,25 @@ async def run_youtube_unlock_test(query, provider):
             
             await query.edit_message_text(
                 f"⏰ 测试 *{provider}* 超时\n\n"
-                f"测试时间超过10分钟，请稍后重试",
+                f"测试时间超过30分钟，请稍后重试",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+        except Exception as cmd_error:
+            error_details = traceback.format_exc()
+            logger.error(f"执行油管解锁命令时发生错误: {str(cmd_error)}\n{error_details}")
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"❌ 执行测试命令失败\n\n"
+                f"错误: {str(cmd_error)[:300]}",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
