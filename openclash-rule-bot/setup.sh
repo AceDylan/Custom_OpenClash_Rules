@@ -1947,8 +1947,12 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
-# Go 环境从宿主机挂载，无需在容器内安装
-ENV PATH=$PATH:/opt/go/bin
+# 安装 Go 环境
+RUN wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
+    rm go1.21.5.linux-amd64.tar.gz
+
+ENV PATH=$PATH:/usr/local/go/bin
 ENV GOPATH=/root/go
 ENV GOPROXY=https://goproxy.cn,direct
 
@@ -1965,8 +1969,6 @@ services:
     volumes:
       - ./repo:/app/repo
       - /root/clash-speedtest:/root/clash-speedtest
-      - /usr/bin/go:/opt/go/bin/go:ro
-      - /usr/bin/gofmt:/opt/go/bin/gofmt:ro
       - /root/go:/root/go
     environment:
       - TZ=Asia/Shanghai 
