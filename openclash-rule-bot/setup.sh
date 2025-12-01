@@ -1760,7 +1760,7 @@ async def run_youtube_unlock_test(query, provider):
             await query.edit_message_text(
                 f"✅ *{provider}* 油管解锁测试完成\n\n"
                 f"📋 *测试结果:*\n"
-                f"```\n{result_content}\n```",
+                f"\`\`\`\n{result_content}\n\`\`\`",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
@@ -1931,7 +1931,7 @@ requests>=2.28.1
 EOF
 
 cat > Dockerfile << 'EOF'
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
@@ -1940,17 +1940,22 @@ COPY requirements.txt /app/
 
 # 安装依赖和 Go 环境
 RUN apt-get update && \
-    apt-get install -y git dbus polkitd pkexec wget && \
+    apt-get install -y git dbus polkitd pkexec wget ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
-# 安装 Go
-RUN wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
-    rm go1.21.5.linux-amd64.tar.gz
+# 检测架构并安装对应的 Go 版本
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+        wget -q https://go.dev/dl/go1.21.5.linux-arm64.tar.gz -O go.tar.gz; \
+    else \
+        wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz -O go.tar.gz; \
+    fi && \
+    tar -C /usr/local -xzf go.tar.gz && \
+    rm go.tar.gz
 
 # 设置 Go 环境变量
 ENV PATH=$PATH:/usr/local/go/bin
