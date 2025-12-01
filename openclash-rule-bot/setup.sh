@@ -141,6 +141,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [
             InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections"),
             InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
+        ],
+        [
+            InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -744,7 +747,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
                 [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
                 [InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")],
-                [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")]
+                [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")],
+                [InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -764,6 +768,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         elif action == "clear_connections":
             await clear_connections(query)
+            return
+        elif action == "youtube_unlock":
+            await show_youtube_unlock_options(query)
             return
 
     # 添加规则
@@ -942,6 +949,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             page = user_states[user_id].get("page", 0)
             user_states[user_id]["step"] = "select_rule"
             await show_movable_rules(query, user_id, source_path, page)
+
+    # 油管解锁测试
+    elif callback_data.startswith("youtube_unlock:"):
+        parts = callback_data.split(":")
+        if parts[1] == "test":
+            provider = parts[2]
+            await run_youtube_unlock_test(query, provider)
 
 async def show_rules_page(query, user_id, file_path, page):
     """显示规则文件的内容（分页）"""
@@ -1622,6 +1636,165 @@ async def clear_connections(query):
             reply_markup=reply_markup
         )
 
+# 油管解锁测试相关配置
+YOUTUBE_UNLOCK_PROVIDERS = {
+    "MAOSU": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/MAOSU?target=ClashMeta",
+    "流量光": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/%E6%B5%81%E9%87%8F%E5%85%89?target=ClashMeta",
+    "ALPHA": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/ALPHA?target=ClashMeta",
+    "STGA": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/STGA?target=ClashMeta"
+}
+
+async def show_youtube_unlock_options(query):
+    """显示油管解锁测试选项"""
+    try:
+        keyboard = [
+            [InlineKeyboardButton("🔵 MAOSU", callback_data="youtube_unlock:test:MAOSU")],
+            [InlineKeyboardButton("💡 流量光", callback_data="youtube_unlock:test:流量光")],
+            [InlineKeyboardButton("🟢 ALPHA", callback_data="youtube_unlock:test:ALPHA")],
+            [InlineKeyboardButton("🔴 STGA", callback_data="youtube_unlock:test:STGA")],
+            [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "📺 *油管解锁测试*\n\n"
+            "请选择要测试的订阅提供商：\n\n"
+            "测试将检查各节点对YouTube的解锁情况",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logger.error(f"显示油管解锁选项时发生错误: {str(e)}")
+        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(f"❌ 操作失败: {str(e)}", reply_markup=reply_markup)
+
+async def run_youtube_unlock_test(query, provider):
+    """执行油管解锁测试"""
+    try:
+        if provider not in YOUTUBE_UNLOCK_PROVIDERS:
+            await query.edit_message_text(f"❌ 未知的提供商: {provider}")
+            return
+        
+        url = YOUTUBE_UNLOCK_PROVIDERS[provider]
+        
+        await query.edit_message_text(
+            f"⏳ 正在测试 *{provider}* 的油管解锁情况...\n\n"
+            f"🔄 正在下载配置并执行测试，请耐心等待...\n"
+            f"（此过程可能需要几分钟）",
+            parse_mode='Markdown'
+        )
+        
+        # 执行测试命令
+        # 工作目录为 /root/clash-speedtest（已挂载到容器）
+        work_dir = "/root/clash-speedtest"
+        cmd = ["go", "run", "youtube-check.go", "-c", url]
+        
+        try:
+            # 运行命令，设置超时时间为10分钟
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=work_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=600  # 10分钟超时
+            )
+            
+            if process.returncode != 0:
+                error_msg = stderr.decode('utf-8', errors='ignore') if stderr else "未知错误"
+                logger.error(f"油管解锁测试命令执行失败: {error_msg}")
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                    [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    f"❌ 测试 *{provider}* 失败\n\n"
+                    f"错误信息: {error_msg[:500]}",
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+                return
+                
+        except asyncio.TimeoutError:
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"⏰ 测试 *{provider}* 超时\n\n"
+                f"测试时间超过10分钟，请稍后重试",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+        
+        # 读取结果文件
+        result_file = os.path.join(work_dir, "youtube_cn.txt")
+        
+        if os.path.exists(result_file):
+            with open(result_file, 'r', encoding='utf-8') as f:
+                result_content = f.read()
+            
+            # Telegram 消息有字数限制，截断过长的内容
+            if len(result_content) > 3500:
+                result_content = result_content[:3500] + "\n\n... (结果过长已截断)"
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"✅ *{provider}* 油管解锁测试完成\n\n"
+                f"📋 *测试结果:*\n"
+                f"```\n{result_content}\n```",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+        else:
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"⚠️ 测试 *{provider}* 完成，但未找到结果文件\n\n"
+                f"请检查 youtube_cn.txt 文件是否生成",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            
+    except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"油管解锁测试时发生错误: {str(e)}\n{error_details}")
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+            [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+            [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"❌ 测试失败: {str(e)}",
+            reply_markup=reply_markup
+        )
+
 async def handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYPE, search_term) -> None:
     """处理搜索输入并显示结果"""
     user_id = update.effective_user.id
@@ -1765,13 +1938,24 @@ WORKDIR /app
 COPY bot.py /app/
 COPY requirements.txt /app/
 
+# 安装依赖和 Go 环境
 RUN apt-get update && \
-    apt-get install -y git dbus polkitd pkexec && \
+    apt-get install -y git dbus polkitd pkexec wget && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
+
+# 安装 Go
+RUN wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
+    rm go1.21.5.linux-amd64.tar.gz
+
+# 设置 Go 环境变量
+ENV PATH=$PATH:/usr/local/go/bin
+ENV GOPATH=/root/go
+ENV GOPROXY=https://goproxy.cn,direct
 
 CMD ["python", "bot.py"] 
 EOF
@@ -1785,6 +1969,7 @@ services:
     network_mode: "host"
     volumes:
       - ./repo:/app/repo
+      - /root/clash-speedtest:/root/clash-speedtest
     environment:
       - TZ=Asia/Shanghai 
 EOF
