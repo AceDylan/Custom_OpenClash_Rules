@@ -1938,8 +1938,8 @@ WORKDIR /app
 COPY bot.py /app/
 COPY requirements.txt /app/
 
-# 安装依赖和 Go 环境
-RUN apt-get update && \
+# 安装依赖和 Go 环境（忽略仓库过期检查，适用于系统时间不同步的情况）
+RUN apt-get -o Acquire::Check-Valid-Until=false update && \
     apt-get install -y git dbus polkitd pkexec wget ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
