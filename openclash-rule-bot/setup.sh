@@ -1940,17 +1940,27 @@ COPY requirements.txt /app/
 
 # 安装依赖和 Go 环境（忽略仓库过期检查，适用于系统时间不同步的情况）
 RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y git dbus polkitd pkexec wget ca-certificates && \
+    apt-get install -y git dbus polkitd pkexec curl ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
-# 安装 Go 环境
-RUN wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
-    rm go1.21.5.linux-amd64.tar.gz
+# 安装 Go 环境（使用 curl 配置重试机制和多源下载）
+RUN set -e && \
+    GO_VERSION="1.21.5" && \
+    GO_ARCH="linux-amd64" && \
+    GO_TAR="go${GO_VERSION}.${GO_ARCH}.tar.gz" && \
+    echo "Downloading Go ${GO_VERSION}..." && \
+    (curl -fSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
+        "https://go.dev/dl/${GO_TAR}" -o "${GO_TAR}" || \
+     curl -fSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
+        "https://golang.google.cn/dl/${GO_TAR}" -o "${GO_TAR}") && \
+    echo "Extracting Go..." && \
+    tar -C /usr/local -xzf "${GO_TAR}" && \
+    rm "${GO_TAR}" && \
+    echo "Go installation completed."
 
 ENV PATH=$PATH:/usr/local/go/bin
 ENV GOPATH=/root/go
