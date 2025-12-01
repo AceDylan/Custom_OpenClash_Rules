@@ -1947,12 +1947,18 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
-# 安装 Go 环境（使用 curl 配置重试机制和多源下载）
+# 安装 Go 环境（自动检测架构并下载对应版本）
 RUN set -e && \
-    GO_VERSION="1.21.5" && \
-    GO_ARCH="linux-amd64" && \
-    GO_TAR="go${GO_VERSION}.${GO_ARCH}.tar.gz" && \
-    echo "Downloading Go ${GO_VERSION}..." && \
+    GO_VERSION="1.23.4" && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "${ARCH}" in \
+        amd64) GO_ARCH="amd64" ;; \
+        arm64) GO_ARCH="arm64" ;; \
+        armhf) GO_ARCH="armv6l" ;; \
+        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac && \
+    GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
+    echo "Downloading Go ${GO_VERSION} for ${GO_ARCH}..." && \
     (curl -fSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
         "https://go.dev/dl/${GO_TAR}" -o "${GO_TAR}" || \
      curl -fSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
@@ -1960,7 +1966,7 @@ RUN set -e && \
     echo "Extracting Go..." && \
     tar -C /usr/local -xzf "${GO_TAR}" && \
     rm "${GO_TAR}" && \
-    echo "Go installation completed."
+    echo "Go ${GO_VERSION} installation completed for ${GO_ARCH}."
 
 ENV PATH=$PATH:/usr/local/go/bin
 ENV GOPATH=/root/go
@@ -1979,9 +1985,8 @@ services:
     volumes:
       - ./repo:/app/repo
       - /root/clash-speedtest:/root/clash-speedtest
-      - /root/go:/root/go
     environment:
-      - TZ=Asia/Shanghai 
+      - TZ=Asia/Shanghai
 EOF
 
 # 创建repo目录
