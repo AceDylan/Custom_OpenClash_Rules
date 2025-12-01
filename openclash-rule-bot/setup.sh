@@ -1948,7 +1948,7 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && \
     chmod -R 777 /app/repo
 
 # Go 环境从宿主机挂载（见 docker-compose.yml）
-ENV PATH=\${PATH}:/usr/local/go/bin
+ENV PATH=$PATH:/usr/local/go/bin
 ENV GOPATH=/root/go
 ENV GOPROXY=https://goproxy.cn,direct
 
