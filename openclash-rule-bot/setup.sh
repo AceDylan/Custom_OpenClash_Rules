@@ -1986,6 +1986,9 @@ services:
       - /root/go:/root/go
     environment:
       - TZ=Asia/Shanghai
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin
+      - GOPATH=/root/go
+      - GOPROXY=https://goproxy.cn,direct
 EOF
 
 # 创建repo目录
