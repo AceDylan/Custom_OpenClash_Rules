@@ -1947,18 +1947,8 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
-# 检测架构并安装对应的 Go 版本
-RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "arm64" ]; then \
-        wget -q https://go.dev/dl/go1.21.5.linux-arm64.tar.gz -O go.tar.gz; \
-    else \
-        wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz -O go.tar.gz; \
-    fi && \
-    tar -C /usr/local -xzf go.tar.gz && \
-    rm go.tar.gz
-
-# 设置 Go 环境变量
-ENV PATH=$PATH:/usr/local/go/bin
+# Go 环境从宿主机挂载，无需在容器内安装
+ENV PATH=$PATH:/opt/go/bin
 ENV GOPATH=/root/go
 ENV GOPROXY=https://goproxy.cn,direct
 
@@ -1975,6 +1965,9 @@ services:
     volumes:
       - ./repo:/app/repo
       - /root/clash-speedtest:/root/clash-speedtest
+      - /usr/bin/go:/opt/go/bin/go:ro
+      - /usr/bin/gofmt:/opt/go/bin/gofmt:ro
+      - /root/go:/root/go
     environment:
       - TZ=Asia/Shanghai 
 EOF
