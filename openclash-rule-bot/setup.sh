@@ -1938,44 +1938,41 @@ WORKDIR /app
 COPY bot.py /app/
 COPY requirements.txt /app/
 
-# 安装依赖和 Go 环境（忽略仓库过期检查，适用于系统时间不同步的情况）
+# 安装依赖（忽略仓库过期检查，适用于系统时间不同步的情况）
 RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y git dbus polkitd pkexec curl ca-certificates && \
+    apt-get install -y git dbus polkitd pkexec ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
-# 安装 Go 环境（自动检测架构并下载对应版本，跳过 SSL 验证以应对系统时间不同步）
-RUN set -e && \
-    GO_VERSION="1.23.4" && \
-    ARCH=$(dpkg --print-architecture) && \
-    case "${ARCH}" in \
-        amd64) GO_ARCH="amd64" ;; \
-        arm64) GO_ARCH="arm64" ;; \
-        armhf) GO_ARCH="armv6l" ;; \
-        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-    esac && \
-    GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
-    echo "Downloading Go ${GO_VERSION} for ${GO_ARCH}..." && \
-    (curl -fSLk --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
-        "https://go.dev/dl/${GO_TAR}" -o "${GO_TAR}" || \
-     curl -fSLk --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
-        "https://golang.google.cn/dl/${GO_TAR}" -o "${GO_TAR}") && \
-    echo "Extracting Go..." && \
-    tar -C /usr/local -xzf "${GO_TAR}" && \
-    rm "${GO_TAR}" && \
-    echo "Go ${GO_VERSION} installation completed for ${GO_ARCH}."
-
-ENV PATH=$PATH:/usr/local/go/bin
+# Go 环境从宿主机挂载（见 docker-compose.yml）
+ENV PATH=\${PATH}:/usr/local/go/bin
 ENV GOPATH=/root/go
 ENV GOPROXY=https://goproxy.cn,direct
 
-CMD ["python", "bot.py"] 
+CMD ["python", "bot.py"]
 EOF
 
-cat > docker-compose.yml << 'EOF'
+# 检测宿主机 Go 环境（在生成 docker-compose.yml 前执行）
+echo "正在检测宿主机 Go 环境..."
+if ! command -v go >/dev/null 2>&1; then
+    echo "错误：未在宿主机上找到 Go 命令"
+    echo "请先在 OpenWrt 上安装 Go 或使用其他部署方式"
+    exit 1
+fi
+
+GO_BIN_PATH=$(which go)
+GO_ROOT=$(go env GOROOT)
+GO_VERSION=$(go version)
+
+echo "✓ 检测到 Go 环境："
+echo "  版本: ${GO_VERSION}"
+echo "  GOROOT: ${GO_ROOT}"
+echo "  Go 可执行文件: ${GO_BIN_PATH}"
+
+cat > docker-compose.yml << EOF
 services:
   telegram-bot:
     build: .
@@ -1985,6 +1982,8 @@ services:
     volumes:
       - ./repo:/app/repo
       - /root/clash-speedtest:/root/clash-speedtest
+      - ${GO_ROOT}:/usr/local/go:ro
+      - /root/go:/root/go
     environment:
       - TZ=Asia/Shanghai
 EOF
