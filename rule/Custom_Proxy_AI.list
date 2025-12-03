@@ -26,3 +26,6 @@ DOMAIN-SUFFIX,88code.org
 
 # 添加域名 privnode.com
 DOMAIN-SUFFIX,privnode.com
+
+# 添加域名 codeium.com
+DOMAIN-SUFFIX,codeium.com
