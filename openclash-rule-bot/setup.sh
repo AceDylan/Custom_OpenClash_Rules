@@ -1642,6 +1642,7 @@ async def clear_connections(query):
 
 # 油管解锁测试相关配置
 YOUTUBE_UNLOCK_PROVIDERS = {
+    "全部": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/collection/All?target=ClashMeta",
     "MAOSU": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/MAOSU?target=ClashMeta",
     "流量光": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/%E6%B5%81%E9%87%8F%E5%85%89?target=ClashMeta",
     "ALPHA": "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/ALPHA?target=ClashMeta",
@@ -1652,6 +1653,7 @@ async def show_youtube_unlock_options(query):
     """显示油管解锁测试选项"""
     try:
         keyboard = [
+            [InlineKeyboardButton("🌟 测试全部", callback_data="youtube_unlock:test:全部")],
             [InlineKeyboardButton("🔵 MAOSU", callback_data="youtube_unlock:test:MAOSU")],
             [InlineKeyboardButton("💡 流量光", callback_data="youtube_unlock:test:流量光")],
             [InlineKeyboardButton("🟢 ALPHA", callback_data="youtube_unlock:test:ALPHA")],
