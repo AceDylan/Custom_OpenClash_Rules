@@ -463,6 +463,10 @@ async def get_repo():
                 # 其他 Git 错误，重新抛出
                 raise e
 
+    # 配置 Git 用户信息（用于 commit）
+    repo.config_writer().set_value("user", "name", "OpenClash Rule Bot").release()
+    repo.config_writer().set_value("user", "email", "bot@openclash-rule-bot.local").release()
+
     return repo
 
 async def get_rule_info(rule_name):
