@@ -27,3 +27,6 @@ DOMAIN-SUFFIX,cloudflare.com
 # 添加域名 linux.do
 DOMAIN-SUFFIX,linux.do
 
+
+# 添加域名 okgg.top
+DOMAIN-SUFFIX,okgg.top
