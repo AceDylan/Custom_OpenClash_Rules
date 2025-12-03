@@ -29,3 +29,6 @@ DOMAIN-SUFFIX,privnode.com
 
 # 添加域名 codeium.com
 DOMAIN-SUFFIX,codeium.com
+
+# 添加域名 windsurf.com
+DOMAIN-SUFFIX,windsurf.com
