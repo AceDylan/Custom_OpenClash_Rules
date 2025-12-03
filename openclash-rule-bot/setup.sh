@@ -1972,12 +1972,34 @@ WORKDIR /app
 COPY bot.py /app/
 COPY requirements.txt /app/
 
-# 安装依赖（忽略仓库过期检查，适用于系统时间不同步的情况）
-RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y git dbus polkitd pkexec ca-certificates && \
+# 配置使用国内镜像源并安装依赖（提高稳定性）
+RUN set -ex && \
+    # 备份原始源列表
+    cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.bak 2>/dev/null || true && \
+    # 使用阿里云镜像源
+    echo "deb https://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian-security/ bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    # 配置 apt 选项以提高稳定性
+    echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::https::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::Check-Valid-Until "false";' >> /etc/apt/apt.conf.d/80-retries && \
+    # 更新包列表（带重试）
+    (apt-get update || apt-get update || apt-get update) && \
+    # 安装依赖
+    apt-get install -y --no-install-recommends \
+        git \
+        dbus \
+        polkitd \
+        pkexec \
+        ca-certificates && \
+    # 清理缓存
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
+    # 安装 Python 依赖
     pip install --no-cache-dir -r requirements.txt && \
+    # 创建仓库目录
     mkdir -p /app/repo && \
     chmod -R 777 /app/repo
 
