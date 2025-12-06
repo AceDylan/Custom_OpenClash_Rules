@@ -30,3 +30,6 @@ DOMAIN-SUFFIX,linux.do
 
 # 添加域名 okgg.top
 DOMAIN-SUFFIX,okgg.top
+
+# 添加域名 apro.alphatvapp.top
+DOMAIN-SUFFIX,apro.alphatvapp.top
