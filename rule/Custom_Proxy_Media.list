@@ -1,8 +1,6 @@
 # 机场
 DOMAIN-SUFFIX,m78star.cloud
 DOMAIN-SUFFIX,llgjc1.com
-DOMAIN-SUFFIX,okti.xyz
-DOMAIN-SUFFIX,okxyz.xyz
 DOMAIN-SUFFIX,maosu.vip
 
 # 影巢
@@ -19,14 +17,8 @@ DOMAIN-SUFFIX,b.blackcatfilm.cc
 # 添加域名 cloudflare.com
 DOMAIN-SUFFIX,cloudflare.com
 
-
-
-
-
-
 # 添加域名 linux.do
 DOMAIN-SUFFIX,linux.do
-
 
 # 添加域名 okgg.top
 DOMAIN-SUFFIX,okgg.top
