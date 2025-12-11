@@ -98,27 +98,27 @@ def categorize_nodes_by_region(names: list[str]) -> dict[str, list[str]]:
     return region_nodes
 
 
-def build_exclude_pattern(original_pattern: str, exclude_nodes: list[str]) -> str:
+def build_exclude_pattern(region_keyword: str, exclude_nodes: list[str]) -> str:
     """构建带排除的正则表达式
 
     Args:
-        original_pattern: 原始正则，如 (.*((?i)香港))
+        region_keyword: 地区关键词，如 "香港"
         exclude_nodes: 要排除的节点名称列表
 
     Returns:
-        带负向前瞻的正则表达式
+        带负向前瞻的正则表达式，格式: ^(?!.*(node1|node2)).*(?i)地区
     """
     if not exclude_nodes:
-        return original_pattern
+        # 无排除时返回简单匹配
+        return f"(.*((?i){region_keyword}))"
 
-    # 构建排除部分：(?!node1|node2|...)
+    # 构建排除部分：^(?!.*(node1|node2|...))
+    # 关键：前瞻内部需要 .* 来检查整个字符串
     escaped_nodes = [escape_regex(name) for name in exclude_nodes]
-    exclude_part = "(?!(" + "|".join(escaped_nodes) + "))"
+    exclude_part = "^(?!.*(" + "|".join(escaped_nodes) + "))"
 
-    # 将排除部分插入到原始正则的开头
-    # 原始格式: (.*((?i)香港))
-    # 新格式: (?!(node1|node2))(.*((?i)香港))
-    return exclude_part + original_pattern
+    # 完整正则：^(?!.*(排除节点)).*(?i)地区关键词
+    return f"{exclude_part}.*(?i){region_keyword}"
 
 
 def update_region_groups(config_path: Path, region_nodes: dict[str, list[str]]) -> int:
@@ -161,11 +161,8 @@ def update_region_groups(config_path: Path, region_nodes: dict[str, list[str]]) 
             # parts[3] = "https://www.gstatic.com/generate_204"
             # parts[4] = "120"
 
-            # 原始的地区匹配正则（不带排除）
-            original_regex = f"(.*((?i){region_keyword}))"
-
             # 构建新的带排除的正则
-            new_regex = build_exclude_pattern(original_regex, exclude_nodes)
+            new_regex = build_exclude_pattern(region_keyword, exclude_nodes)
 
             # 重建该行
             parts[2] = new_regex
