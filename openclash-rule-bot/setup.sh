@@ -960,6 +960,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if parts[1] == "test":
             provider = parts[2]
             await run_youtube_unlock_test(query, provider)
+        elif parts[1] == "update_rule":
+            provider = parts[2]
+            await update_youtube_cn_rule(query, provider)
 
 async def show_rules_page(query, user_id, file_path, page):
     """显示规则文件的内容（分页）"""
@@ -1777,29 +1780,27 @@ async def run_youtube_unlock_test(query, provider):
         
         # 读取结果文件
         result_file = os.path.join(work_dir, "youtube_cn.txt")
-        
+
         if os.path.exists(result_file):
             with open(result_file, 'r', encoding='utf-8') as f:
                 result_content = f.read()
-            
+
             # Telegram 消息有字数限制，截断过长的内容
-            if len(result_content) > 3500:
-                result_content = result_content[:3500] + "\n\n... (结果过长已截断)"
-            
-            keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
-                [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
+            display_content = result_content
+            if len(display_content) > 2500:
+                display_content = display_content[:2500] + "\n\n... (结果过长已截断)"
+
+            # 先显示测试结果
             await query.edit_message_text(
                 f"✅ *{provider}* 油管解锁测试完成\n\n"
                 f"📋 *测试结果:*\n"
-                f"\`\`\`\n{result_content}\n\`\`\`",
-                parse_mode='Markdown',
-                reply_markup=reply_markup
+                f"```\n{display_content}\n```\n\n"
+                f"⏳ 正在自动更新送中节点规则...",
+                parse_mode='Markdown'
             )
+
+            # 自动调用规则更新函数
+            await update_youtube_cn_rule(query, provider)
         else:
             keyboard = [
                 [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
@@ -1830,6 +1831,331 @@ async def run_youtube_unlock_test(query, provider):
             f"❌ 测试失败: {str(e)}",
             reply_markup=reply_markup
         )
+
+
+# 送中节点规则更新相关配置
+RULES_REPO_PATH = REPO_PATH  # 使用与主仓库相同的路径 /app/repo
+YOUTUBE_CN_FILE = "/root/clash-speedtest/youtube_cn.txt"
+UPDATE_SCRIPT = os.path.join(REPO_PATH, "scripts/update_youtube_cn_group.py")
+CONFIG_INI_FILE = os.path.join(REPO_PATH, "cfg/Custom_Clash.ini")
+
+
+async def update_youtube_cn_rule(query, provider):
+    """更新送中节点规则并推送到 GitHub"""
+    try:
+        await query.edit_message_text(
+            f"📝 正在更新送中节点规则...\n\n"
+            f"⏳ 步骤 1/3: 解析测试结果...",
+            parse_mode='Markdown'
+        )
+
+        # 检查测试结果文件是否存在
+        if not os.path.exists(YOUTUBE_CN_FILE):
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                f"❌ 未找到测试结果文件\n\n"
+                f"请先执行油管解锁测试",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+
+        # 执行 Python 脚本更新配置
+        await query.edit_message_text(
+            f"📝 正在更新送中节点规则...\n\n"
+            f"✅ 步骤 1/3: 解析测试结果完成\n"
+            f"⏳ 步骤 2/3: 更新配置文件...",
+            parse_mode='Markdown'
+        )
+
+        update_cmd = [
+            "python3", UPDATE_SCRIPT,
+            "--local", YOUTUBE_CN_FILE,
+            "--config", CONFIG_INI_FILE
+        ]
+
+        logger.info(f"执行更新脚本: {update_cmd}")
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *update_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=60
+            )
+
+            stdout_text = stdout.decode('utf-8', errors='ignore') if stdout else ""
+            stderr_text = stderr.decode('utf-8', errors='ignore') if stderr else ""
+
+            # 保存更新脚本的输出，用于后续提取节点数量
+            update_script_output = stdout_text
+
+            logger.info(f"更新脚本输出: {stdout_text}")
+            if stderr_text:
+                logger.warning(f"更新脚本错误输出: {stderr_text}")
+
+            if process.returncode != 0:
+                keyboard = [
+                    [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    f"❌ 更新配置文件失败\n\n"
+                    f"错误: {stderr_text or stdout_text}",
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+                return
+
+        except asyncio.TimeoutError:
+            keyboard = [
+                [InlineKeyboardButton("🔄 重试", callback_data=f"youtube_unlock:update_rule:{provider}")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                f"⏰ 更新脚本执行超时",
+                reply_markup=reply_markup
+            )
+            return
+
+        # 检查是否有更改需要提交
+        await query.edit_message_text(
+            f"📝 正在更新送中节点规则...\n\n"
+            f"✅ 步骤 1/3: 解析测试结果完成\n"
+            f"✅ 步骤 2/3: 更新配置文件完成\n"
+            f"⏳ 步骤 3/3: 提交到 GitHub...",
+            parse_mode='Markdown'
+        )
+
+        # 检查 git 状态
+        git_status_cmd = ["git", "-C", RULES_REPO_PATH, "status", "--porcelain", "cfg/Custom_Clash.ini"]
+
+        process = await asyncio.create_subprocess_exec(
+            *git_status_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=30
+        )
+
+        git_status = stdout.decode('utf-8', errors='ignore').strip()
+
+        if not git_status:
+            # 没有更改
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+                [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                f"ℹ️ 配置文件无变化\n\n"
+                f"当前规则与测试结果一致，无需更新",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+
+        # 执行 git 操作，带冲突自动解决
+        async def run_git_cmd(cmd, step_name, timeout_sec=120):
+            """执行 git 命令并返回结果"""
+            logger.info(f"执行 git 命令 ({step_name}): {cmd}")
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=timeout_sec
+            )
+            stdout_text = stdout.decode('utf-8', errors='ignore') if stdout else ""
+            stderr_text = stderr.decode('utf-8', errors='ignore') if stderr else ""
+            return process.returncode, stdout_text, stderr_text
+
+        # Step 1: git add
+        returncode, stdout_text, stderr_text = await run_git_cmd(
+            ["git", "-C", RULES_REPO_PATH, "add", "cfg/Custom_Clash.ini"],
+            "添加文件"
+        )
+        if returncode != 0:
+            keyboard = [
+                [InlineKeyboardButton("🔄 重试", callback_data=f"youtube_unlock:update_rule:{provider}")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                f"⚠️ Git 添加文件失败\n\n错误: {(stderr_text or stdout_text)[:300]}",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+
+        # Step 2: git commit
+        returncode, stdout_text, stderr_text = await run_git_cmd(
+            ["git", "-C", RULES_REPO_PATH, "commit", "-m", f"chore: update youtube_cn group from {provider} test"],
+            "提交更改"
+        )
+        if returncode != 0:
+            keyboard = [
+                [InlineKeyboardButton("🔄 重试", callback_data=f"youtube_unlock:update_rule:{provider}")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                f"⚠️ Git 提交更改失败\n\n错误: {(stderr_text or stdout_text)[:300]}",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+
+        # Step 3: git push (带自动拉取和冲突解决)
+        returncode, stdout_text, stderr_text = await run_git_cmd(
+            ["git", "-C", RULES_REPO_PATH, "push"],
+            "推送到远程"
+        )
+
+        # 如果 push 失败，尝试 pull --rebase 然后重新 push
+        if returncode != 0:
+            logger.warning(f"Git push 失败，尝试 pull --rebase: {stderr_text}")
+
+            await query.edit_message_text(
+                f"📝 正在更新送中节点规则...\n\n"
+                f"✅ 步骤 1/3: 解析测试结果完成\n"
+                f"✅ 步骤 2/3: 更新配置文件完成\n"
+                f"⏳ 步骤 3/3: 检测到远程更新，正在同步...",
+                parse_mode='Markdown'
+            )
+
+            # 尝试 pull --rebase，对于 Custom_Clash.ini 使用我们的版本解决冲突
+            returncode, stdout_text, stderr_text = await run_git_cmd(
+                ["git", "-C", RULES_REPO_PATH, "pull", "--rebase", "-X", "theirs"],
+                "拉取远程更新"
+            )
+
+            if returncode != 0:
+                # 如果 rebase 失败，尝试中止 rebase 并使用 merge 策略
+                logger.warning(f"Git pull --rebase 失败: {stderr_text}")
+
+                # 中止可能的 rebase 状态
+                await run_git_cmd(
+                    ["git", "-C", RULES_REPO_PATH, "rebase", "--abort"],
+                    "中止 rebase"
+                )
+
+                # 尝试普通 pull 并自动解决冲突（保留我们的更改）
+                returncode, stdout_text, stderr_text = await run_git_cmd(
+                    ["git", "-C", RULES_REPO_PATH, "pull", "--no-rebase", "-X", "ours"],
+                    "拉取远程更新(merge)"
+                )
+
+                if returncode != 0:
+                    # 如果还有冲突，强制使用我们的版本
+                    logger.warning(f"Git pull merge 失败，尝试强制解决冲突")
+
+                    # 检出我们的版本
+                    await run_git_cmd(
+                        ["git", "-C", RULES_REPO_PATH, "checkout", "--ours", "cfg/Custom_Clash.ini"],
+                        "使用本地版本"
+                    )
+
+                    # 添加解决后的文件
+                    await run_git_cmd(
+                        ["git", "-C", RULES_REPO_PATH, "add", "cfg/Custom_Clash.ini"],
+                        "添加解决后的文件"
+                    )
+
+                    # 继续 merge/rebase
+                    await run_git_cmd(
+                        ["git", "-C", RULES_REPO_PATH, "-c", "core.editor=true", "merge", "--continue"],
+                        "完成合并"
+                    )
+
+            # 再次尝试 push
+            returncode, stdout_text, stderr_text = await run_git_cmd(
+                ["git", "-C", RULES_REPO_PATH, "push"],
+                "重新推送"
+            )
+
+            if returncode != 0:
+                # 最终失败，报告错误
+                logger.error(f"Git push 最终失败: {stderr_text}")
+                keyboard = [
+                    [InlineKeyboardButton("🔄 重试", callback_data=f"youtube_unlock:update_rule:{provider}")],
+                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    f"⚠️ Git 推送失败\n\n"
+                    f"已尝试自动解决冲突但仍失败\n"
+                    f"错误: {(stderr_text or stdout_text)[:300]}",
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+                return
+
+        # 成功
+        keyboard = [
+            [InlineKeyboardButton("🔄 重新测试", callback_data=f"youtube_unlock:test:{provider}")],
+            [InlineKeyboardButton("📺 选择其他", callback_data="action:youtube_unlock")],
+            [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # 提取更新脚本输出中的节点数量
+        node_count = "未知"
+        if "获取到" in update_script_output and "个成功的节点" in update_script_output:
+            import re as re_module
+            match = re_module.search(r"获取到\s*(\d+)\s*个成功的节点", update_script_output)
+            if match:
+                node_count = match.group(1)
+
+        # 提取更新的地区分组数量
+        region_count = "0"
+        if "已更新" in update_script_output and "个地区分组" in update_script_output:
+            import re as re_module
+            match = re_module.search(r"已更新\s*(\d+)\s*个地区分组", update_script_output)
+            if match:
+                region_count = match.group(1)
+
+        await query.edit_message_text(
+            f"✅ 送中节点规则更新成功!\n\n"
+            f"📊 送中节点: *{node_count}* 个\n"
+            f"🌍 已从 *{region_count}* 个地区分组中排除\n"
+            f"📤 已推送到 GitHub\n\n"
+            f"测试提供商: *{provider}*",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"更新送中节点规则时发生错误: {str(e)}\n{error_details}")
+
+        keyboard = [
+            [InlineKeyboardButton("🔄 重试", callback_data=f"youtube_unlock:update_rule:{provider}")],
+            [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            f"❌ 更新失败: {str(e)}",
+            reply_markup=reply_markup
+        )
+
 
 async def handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYPE, search_term) -> None:
     """处理搜索输入并显示结果"""
