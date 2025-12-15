@@ -42,3 +42,6 @@ DOMAIN-SUFFIX,maosu.website
 
 # 添加域名 sub999999999.maosu.website
 DOMAIN-SUFFIX,sub999999999.maosu.website
+
+# 添加域名 sub.255588.xyz
+DOMAIN-SUFFIX,sub.255588.xyz
