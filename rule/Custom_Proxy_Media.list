@@ -39,3 +39,6 @@ DOMAIN-SUFFIX,i.stga.cn
 # 添加域名 maosu.website
 DOMAIN-SUFFIX,maosu.website
 
+
+# 添加域名 sub999999999.maosu.website
+DOMAIN-SUFFIX,sub999999999.maosu.website
