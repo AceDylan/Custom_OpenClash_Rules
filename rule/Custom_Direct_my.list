@@ -97,3 +97,6 @@ DOMAIN-SUFFIX,tvyan.com
 
 # 添加IP 156.251.183.201
 IP-CIDR,156.251.183.201/32,no-resolve
+
+# 添加IP 103.49.61.144
+IP-CIDR,103.49.61.144/32,no-resolve
