@@ -94,3 +94,6 @@ DOMAIN-SUFFIX,abs.204cloud.com
 DOMAIN-SUFFIX,tvyan.com
 
 
+
+# 添加IP 156.251.183.201
+IP-CIDR,156.251.183.201/32,no-resolve
