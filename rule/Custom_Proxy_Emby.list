@@ -53,3 +53,6 @@ IP-CIDR,107.181.238.190/32,no-resolve
 
 # 添加域名 sg.emby.bid
 DOMAIN-SUFFIX,sg.emby.bid
+
+# 添加域名 hk.emby.loan
+DOMAIN-SUFFIX,hk.emby.loan
