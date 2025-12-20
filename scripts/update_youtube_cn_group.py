@@ -20,13 +20,12 @@ YOUTUBE_CN_URL = "https://raw.githubusercontent.com/AceDylan/clash-speedtest/mai
 CONFIG_FILE = Path(__file__).parent.parent / "cfg" / "Custom_Clash.ini"
 
 # 地区关键词映射：地区名 -> (INI中的分组名, 匹配关键词列表)
+# 只更新香港、美国、新加坡、日本这四个地区的节点分组
 REGION_MAPPING = {
     "香港": ("🇭🇰 香港节点", ["香港", "hk", "hong kong", "hongkong"]),
     "日本": ("🇯🇵 日本节点", ["日本", "jp", "japan", "tokyo", "osaka"]),
     "美国": ("🇺🇸 美国节点", ["美国", "us", "usa", "america", "united states"]),
     "新加坡": ("🇸🇬 新加坡节点", ["新加坡", "sg", "singapore"]),
-    "韩国": ("🇰🇷 韩国节点", ["韩国", "kr", "korea", "seoul"]),
-    "台湾": ("🇹🇼 台湾节点", ["台湾", "tw", "taiwan"]),
 }
 
 
