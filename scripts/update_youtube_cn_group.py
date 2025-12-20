@@ -179,18 +179,32 @@ def update_region_groups(config_path: Path, region_nodes: dict[str, list[str]]) 
 def update_config(config_path: Path, pattern: str) -> bool:
     """更新配置文件中的 🔙 送中节点 分组"""
     content = config_path.read_text(encoding="utf-8")
+    lines = content.split("\n")
+    updated = False
 
-    # 匹配 🔙 送中节点 分组行
-    old_pattern = r"(custom_proxy_group=🔙 送中节点`url-test`)\([^)]+\)(`https://www\.gstatic\.com/generate_204`\d+)"
-    new_line = rf"\g<1>{pattern}\g<2>"
+    for i, line in enumerate(lines):
+        if not line.startswith("custom_proxy_group=🔙 送中节点`url-test`"):
+            continue
 
-    new_content, count = re.subn(old_pattern, new_line, content)
+        # 找到送中节点行，按 ` 分割
+        # 格式: custom_proxy_group=🔙 送中节点`url-test`REGEX`URL`TIMEOUT
+        parts = line.split("`")
+        if len(parts) >= 5:
+            # parts[0] = "custom_proxy_group=🔙 送中节点"
+            # parts[1] = "url-test"
+            # parts[2] = 正则表达式
+            # parts[3] = URL
+            # parts[4] = timeout
+            parts[2] = pattern
+            lines[i] = "`".join(parts)
+            updated = True
+            break
 
-    if count == 0:
+    if not updated:
         print("未找到 🔙 送中节点 分组配置")
         return False
 
-    config_path.write_text(new_content, encoding="utf-8")
+    config_path.write_text("\n".join(lines), encoding="utf-8")
     return True
 
 
