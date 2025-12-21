@@ -1793,9 +1793,12 @@ async def run_hk_speedtest(query):
         # 显示结果
         if result_content.strip():
             # Telegram 消息有字数限制，截断过长的内容
-            display_content = result_content
+            display_content = result_content.strip()
             if len(display_content) > 3000:
                 display_content = display_content[:3000] + "\n\n... (结果过长已截断)"
+
+            # 记录要显示的内容
+            logger.info(f"准备显示的内容前100字符: {display_content[:100]}")
 
             keyboard = [
                 [InlineKeyboardButton("🔄 重新测试", callback_data="action:hk_speedtest")],
@@ -1803,11 +1806,15 @@ async def run_hk_speedtest(query):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
+            # 使用 HTML 格式，避免 Markdown 解析问题
+            # 转义 HTML 特殊字符
+            html_content = display_content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            
             await query.edit_message_text(
-                f"✅ *香港节点速度测试完成*\n\n"
-                f"📋 *测试结果:*\n"
-                f"```\n{display_content}\n```",
-                parse_mode='Markdown',
+                f"✅ <b>香港节点速度测试完成</b>\n\n"
+                f"📋 <b>测试结果:</b>\n"
+                f"<pre>{html_content}</pre>",
+                parse_mode='HTML',
                 reply_markup=reply_markup
             )
         else:
