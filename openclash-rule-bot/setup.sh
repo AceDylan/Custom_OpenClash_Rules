@@ -1749,11 +1749,49 @@ async def run_hk_speedtest(query):
             )
             return
 
+        # 等待文件系统同步
+        await asyncio.sleep(3)
+
         # 读取结果文件
+        result_content = ""
+        logger.info(f"检查结果文件: {HK_SPEEDTEST_RESULT_FILE}")
+        
         if os.path.exists(HK_SPEEDTEST_RESULT_FILE):
+            # 获取文件大小
+            file_size = os.path.getsize(HK_SPEEDTEST_RESULT_FILE)
+            logger.info(f"结果文件存在，大小: {file_size} bytes")
+
             with open(HK_SPEEDTEST_RESULT_FILE, 'r', encoding='utf-8') as f:
                 result_content = f.read()
 
+            logger.info(f"从文件读取到内容长度: {len(result_content)}")
+        else:
+            logger.warning(f"结果文件不存在: {HK_SPEEDTEST_RESULT_FILE}")
+
+        # 如果文件为空或不存在，尝试从 stdout 提取结果
+        if not result_content.strip():
+            logger.warning("结果文件为空或不存在，尝试从命令输出中提取结果")
+            # 解析 stdout 中的结果表格
+            if stdout_text:
+                lines = stdout_text.strip().split('\n')
+                result_lines = []
+                for line in lines:
+                    line = line.strip()
+                    # 跳过标题行和空行
+                    if not line or line.startswith('Clash Speedtest') or line.startswith('序号'):
+                        continue
+                    # 检查是否是数据行（以数字开头，如 "1." 或 "12."）
+                    import re as re_module
+                    if re_module.match(r'^\d+\.', line):
+                        result_lines.append(line)
+                if result_lines:
+                    result_content = '\n'.join(result_lines)
+                    logger.info(f"从stdout提取到 {len(result_lines)} 行结果")
+                else:
+                    logger.warning("无法从stdout提取结果行")
+
+        # 显示结果
+        if result_content.strip():
             # Telegram 消息有字数限制，截断过长的内容
             display_content = result_content
             if len(display_content) > 3000:
@@ -1780,7 +1818,7 @@ async def run_hk_speedtest(query):
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await query.edit_message_text(
-                "⚠️ 香港节点速度测试完成，但未找到结果文件\n\n"
+                "⚠️ 香港节点速度测试完成，但未能获取结果\n\n"
                 "请检查 hk_speedtest.txt 文件是否生成",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
