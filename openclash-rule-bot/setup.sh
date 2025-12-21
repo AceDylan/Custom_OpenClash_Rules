@@ -143,7 +143,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
         ],
         [
-            InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")
+            InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock"),
+            InlineKeyboardButton("🇭🇰 香港节点测速", callback_data="action:hk_speedtest")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -663,7 +664,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     user_id = update.effective_user.id
-    if user_id not in user_states and not query.data.startswith("action:") and not query.data.startswith("youtube_unlock:"):
+    if user_id not in user_states and not query.data.startswith("action:") and not query.data.startswith("youtube_unlock:") and not query.data.startswith("hk_speedtest:"):
         await query.edit_message_text("⏱️ 会话已过期，请重新开始。")
         return
 
@@ -752,7 +753,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
                 [InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")],
                 [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")],
-                [InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")]
+                [InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")],
+                [InlineKeyboardButton("🇭🇰 香港节点测速", callback_data="action:hk_speedtest")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -775,6 +777,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         elif action == "youtube_unlock":
             await show_youtube_unlock_options(query)
+            return
+        elif action == "hk_speedtest":
+            await run_hk_speedtest(query)
             return
 
     # 添加规则
@@ -1637,9 +1642,162 @@ async def clear_connections(query):
         # 创建返回按钮
         keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await query.edit_message_text(
             f"❌ 操作失败: {str(e)}",
+            reply_markup=reply_markup
+        )
+
+# 香港节点速度测试相关配置
+HK_SPEEDTEST_URL = "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/collection/All-copy7963?target=ClashMeta"
+HK_SPEEDTEST_RESULT_FILE = "/root/clash-speedtest/hk_speedtest.txt"
+
+async def run_hk_speedtest(query):
+    """执行香港节点速度测试"""
+    try:
+        await query.edit_message_text(
+            "⏳ 正在进行 *香港节点速度测试*...\n\n"
+            "🔄 正在下载配置并执行测试，请耐心等待...\n"
+            "（此过程可能需要几分钟）",
+            parse_mode='Markdown'
+        )
+
+        # 执行测试命令
+        work_dir = "/root/clash-speedtest"
+        cmd = ["go", "run", "main.go", "-c", HK_SPEEDTEST_URL, "-txt", "hk_speedtest.txt"]
+
+        logger.info(f"开始执行香港节点速度测试: cmd={cmd}, work_dir={work_dir}")
+
+        try:
+            # 运行命令，设置超时时间为30分钟
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=work_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            logger.info(f"进程已创建，等待执行完成...")
+
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=1800  # 30分钟超时
+            )
+
+            stdout_text = stdout.decode('utf-8', errors='ignore') if stdout else ""
+            stderr_text = stderr.decode('utf-8', errors='ignore') if stderr else ""
+
+            logger.info(f"命令执行完成: returncode={process.returncode}")
+            logger.info(f"命令输出 stdout:\n{stdout_text[:2000]}")
+            if stderr_text:
+                logger.info(f"命令输出 stderr:\n{stderr_text[:2000]}")
+
+            if process.returncode != 0:
+                error_msg = stderr_text if stderr_text else "未知错误"
+                logger.error(f"香港节点速度测试命令执行失败: {error_msg}")
+
+                keyboard = [
+                    [InlineKeyboardButton("🔄 重新测试", callback_data="action:hk_speedtest")],
+                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await query.edit_message_text(
+                    f"❌ 香港节点速度测试失败\n\n"
+                    f"错误信息: {error_msg[:500]}",
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+                return
+
+        except asyncio.TimeoutError:
+            # 超时时终止子进程，避免僵尸进程
+            try:
+                process.terminate()
+                await process.wait()
+            except Exception:
+                pass
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data="action:hk_speedtest")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                "⏰ 香港节点速度测试超时\n\n"
+                "测试时间超过30分钟，请稍后重试",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+        except Exception as cmd_error:
+            error_details = traceback.format_exc()
+            logger.error(f"执行香港节点速度测试命令时发生错误: {str(cmd_error)}\n{error_details}")
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data="action:hk_speedtest")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                f"❌ 执行测试命令失败\n\n"
+                f"错误: {str(cmd_error)[:300]}",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return
+
+        # 读取结果文件
+        if os.path.exists(HK_SPEEDTEST_RESULT_FILE):
+            with open(HK_SPEEDTEST_RESULT_FILE, 'r', encoding='utf-8') as f:
+                result_content = f.read()
+
+            # Telegram 消息有字数限制，截断过长的内容
+            display_content = result_content
+            if len(display_content) > 3000:
+                display_content = display_content[:3000] + "\n\n... (结果过长已截断)"
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data="action:hk_speedtest")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                f"✅ *香港节点速度测试完成*\n\n"
+                f"📋 *测试结果:*\n"
+                f"```\n{display_content}\n```",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+        else:
+            keyboard = [
+                [InlineKeyboardButton("🔄 重新测试", callback_data="action:hk_speedtest")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                "⚠️ 香港节点速度测试完成，但未找到结果文件\n\n"
+                "请检查 hk_speedtest.txt 文件是否生成",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+
+    except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"香港节点速度测试时发生错误: {str(e)}\n{error_details}")
+
+        keyboard = [
+            [InlineKeyboardButton("🔄 重新测试", callback_data="action:hk_speedtest")],
+            [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            f"❌ 测试失败: {str(e)}",
             reply_markup=reply_markup
         )
 
