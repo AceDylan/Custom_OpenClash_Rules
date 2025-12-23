@@ -103,3 +103,6 @@ IP-CIDR,103.49.61.144/32,no-resolve
 
 # 添加IP 103.234.53.188
 IP-CIDR,103.234.53.188/32,no-resolve
+
+# 添加域名 dmit.acedylan.us
+DOMAIN-SUFFIX,dmit.acedylan.us
