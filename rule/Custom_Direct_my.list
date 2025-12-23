@@ -109,3 +109,6 @@ DOMAIN-SUFFIX,dmit.acedylan.us
 
 # 添加IP 69.63.207.155
 IP-CIDR,69.63.207.155/32,no-resolve
+
+# 添加IP 156.251.183.138
+IP-CIDR,156.251.183.138/32,no-resolve
