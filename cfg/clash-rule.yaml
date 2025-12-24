@@ -16,7 +16,7 @@ proxy-providers:
     health-check:
       enable: true
       interval: 600
-      url: https://cp.cloudflare.com/generate_204
+      url: https://www.gstatic.com/generate_204
     override:
       skip-cert-verify: true
       udp: true
