@@ -1,0 +1,461 @@
+# Custom OpenClash Rules - YAML 配置文件
+# 基于 Custom_Clash.ini 转换
+# 作者：https://github.com/Aethersailor
+# 项目地址：https://github.com/Aethersailor/Custom_OpenClash_Rules
+
+# 代理提供者配置
+proxy-providers:
+  provider:
+    type: http
+    url: "订阅链接地址"  # 请替换为你的订阅链接
+    path: ./proxy_provider/provider.yaml
+    proxy: DIRECT
+    header:
+      User-Agent:
+        - clash.meta
+    health-check:
+      enable: true
+      interval: 600
+      url: https://cp.cloudflare.com/generate_204
+    override:
+      skip-cert-verify: true
+      udp: true
+
+# 代理组配置
+proxy-groups:
+  # 社交媒体
+  - name: "💬 社交媒体"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # 国外媒体
+  - name: "🌎 国外媒体"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # AI服务
+  - name: "🤖 AI服务"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # 流媒体
+  - name: "🎥 流媒体"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # 黑猫
+  - name: "🐱 黑猫"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+      - "🎯 全球直连"
+
+  # 油管
+  - name: "📹 油管"
+    type: select
+    proxies:
+      - "🔙 送中组"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # 谷歌服务
+  - name: "🇬 谷歌服务"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+      - "🎯 全球直连"
+
+  # 游戏
+  - name: "🎮 游戏"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🎯 全球直连"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # 漏网之鱼
+  - name: "🐟 漏网之鱼"
+    type: select
+    proxies:
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+      - "🎯 全球直连"
+
+  # 微软服务
+  - name: "Ⓜ️ 微软服务"
+    type: select
+    proxies:
+      - "🎯 全球直连"
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # 测速工具
+  - name: "🚀 测速工具"
+    type: select
+    proxies:
+      - "🎯 全球直连"
+      - "🇭🇰 香港节点"
+      - "🇺🇸 美国节点"
+      - "🇯🇵 日本节点"
+      - "🇸🇬 新加坡节点"
+      - "🏠 香港自建"
+      - "🏗️ 美国自建"
+      - "📈 保底策略"
+      - "💬 全部地区"
+
+  # 送中组 - fallback
+  - name: "🔙 送中组"
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    proxies:
+      - "🔙 送中节点"
+      - "🇸🇬 新加坡节点"
+
+  # 香港节点 - url-test
+  - name: "🇭🇰 香港节点"
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    tolerance: 50
+    filter: "(?i)香港"
+    use:
+      - provider
+
+  # 美国节点 - url-test
+  - name: "🇺🇸 美国节点"
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    tolerance: 50
+    filter: "(?i)美国"
+    use:
+      - provider
+
+  # 新加坡节点 - url-test
+  - name: "🇸🇬 新加坡节点"
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    tolerance: 50
+    filter: "(?i)新加坡"
+    use:
+      - provider
+
+  # 日本节点 - url-test
+  - name: "🇯🇵 日本节点"
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    tolerance: 50
+    filter: "(?!)日本"
+    use:
+      - provider
+
+  # 香港自建 - fallback
+  - name: "🏠 香港自建"
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    filter: "BEST"
+    use:
+      - provider
+    proxies:
+      - "🇭🇰 香港节点"
+
+  # 美国自建 - fallback
+  - name: "🏗️ 美国自建"
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    filter: "DMIT"
+    use:
+      - provider
+    proxies:
+      - "🇺🇸 美国节点"
+
+  # 保底策略 - fallback
+  - name: "📈 保底策略"
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    proxies:
+      - "⏫ 专线家宽"
+      - "🇸🇬 新加坡节点"
+
+  # 专线家宽 - url-test
+  - name: "⏫ 专线家宽"
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    tolerance: 50
+    filter: "(.*?)((?i)香港|日本|新加坡|台湾)(.*?)(IEPL|家宽)"
+    use:
+      - provider
+
+  # 非标端口
+  - name: "🔀 非标端口"
+    type: select
+    proxies:
+      - "🎯 全球直连"
+      - "🐟 漏网之鱼"
+
+  # 送中节点 - url-test
+  - name: "🔙 送中节点"
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 120
+    tolerance: 50
+    filter: ""
+    use:
+      - provider
+
+  # 全部地区
+  - name: "💬 全部地区"
+    type: select
+    filter: "(.*)"
+    use:
+      - provider
+
+  # 全球直连
+  - name: "🎯 全球直连"
+    type: select
+    proxies:
+      - DIRECT
+
+# 规则配置
+rules:
+  # 谷歌服务 - 自定义规则
+  - RULE-SET,Custom_Proxy_Google,🇬 谷歌服务
+  # 自定义直连
+  - RULE-SET,Custom_Direct_my,🎯 全球直连
+  # 流媒体 - Emby
+  - RULE-SET,Custom_Proxy_Emby,🎥 流媒体
+  # 黑猫
+  - RULE-SET,Custom_Proxy_Emby_BlackCat,🐱 黑猫
+  # AI服务
+  - RULE-SET,Custom_Proxy_AI,🤖 AI服务
+  # 国外媒体
+  - RULE-SET,Custom_Proxy_Media,🌎 国外媒体
+  # 本地地址直连
+  - GEOSITE,private,🎯 全球直连
+  - GEOIP,private,🎯 全球直连,no-resolve
+  # PayPal 直连
+  - GEOSITE,paypal,🎯 全球直连
+  # 本项目收录的直连域名规则
+  - RULE-SET,Custom_Direct,🎯 全球直连
+  # 本项目收录的代理域名规则
+  - RULE-SET,Custom_Proxy,🌎 国外媒体
+  # 谷歌在国内可用的域名强制直连
+  - GEOSITE,google-cn,🎯 全球直连
+  # 国内游戏域名强制直连
+  - GEOSITE,category-games@cn,🎯 全球直连
+  # Steam 下载 CDN 地址强制直连
+  - RULE-SET,Steam_CDN,🎯 全球直连
+  # 各大游戏平台下载域名强制直连
+  - GEOSITE,category-game-platforms-download,🎯 全球直连
+  # BT Tracker 相关域名强制直连
+  - GEOSITE,category-public-tracker,🎯 全球直连
+  # 即时通讯 (Telegram/WhatsApp/Line 等)
+  - GEOSITE,category-communication,💬 社交媒体
+  # 社交媒体 (Twitter/Facebook/Instagram 等)
+  - GEOSITE,category-social-media-!cn,💬 社交媒体
+  # AI 服务
+  - GEOSITE,openai,🤖 AI服务
+  - GEOSITE,bing,🤖 AI服务
+  - GEOSITE,category-ai-!cn,🤖 AI服务
+  # GitHub
+  - GEOSITE,github,🌎 国外媒体
+  # 测速工具
+  - GEOSITE,category-speedtest,🚀 测速工具
+  # YouTube
+  - GEOSITE,youtube,📹 油管
+  # 流媒体服务
+  - GEOSITE,apple-tvplus,🎥 流媒体
+  # 微软/苹果服务
+  - GEOSITE,apple,Ⓜ️ 微软服务
+  - GEOSITE,microsoft,Ⓜ️ 微软服务
+  # 谷歌服务
+  - GEOSITE,googlefcm,🇬 谷歌服务
+  - GEOSITE,google,🇬 谷歌服务
+  # 流媒体
+  - GEOSITE,tiktok,🎥 流媒体
+  - GEOSITE,netflix,🎥 流媒体
+  - GEOSITE,disney,🎥 流媒体
+  - GEOSITE,hbo,🎥 流媒体
+  - GEOSITE,primevideo,🎥 流媒体
+  - GEOSITE,category-emby,🎥 流媒体
+  # 国外媒体
+  - GEOSITE,spotify,🌎 国外媒体
+  - GEOSITE,bahamut,🌎 国外媒体
+  # 游戏
+  - GEOSITE,steam,🎮 游戏
+  - GEOSITE,category-games,🎮 游戏
+  # 国外媒体/电商
+  - GEOSITE,category-entertainment,🌎 国外媒体
+  - GEOSITE,category-ecommerce,🌎 国外媒体
+  - GEOSITE,gfw,🌎 国外媒体
+  # GEOIP 规则
+  - GEOIP,telegram,🎥 流媒体,no-resolve
+  - GEOIP,twitter,💬 社交媒体,no-resolve
+  - GEOIP,facebook,💬 社交媒体,no-resolve
+  - GEOIP,google,🇬 谷歌服务,no-resolve
+  - GEOIP,netflix,🎥 流媒体,no-resolve
+  # 国内域名/IP 兜底
+  - GEOSITE,cn,🎯 全球直连
+  - GEOIP,cn,🎯 全球直连,no-resolve
+  # 非标端口
+  - RULE-SET,Custom_Port_Direct,🔀 非标端口
+  # 兜底规则
+  - MATCH,🐟 漏网之鱼
+
+# 规则提供者配置
+rule-providers:
+  Custom_Proxy_Google:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Proxy_Google.yaml
+    type: http
+    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_Google.list"
+    proxy: DIRECT
+
+  Custom_Direct_my:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Direct_my.yaml
+    type: http
+    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Direct_my.list"
+    proxy: DIRECT
+
+  Custom_Proxy_Emby:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Proxy_Emby.yaml
+    type: http
+    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_Emby.list"
+    proxy: DIRECT
+
+  Custom_Proxy_Emby_BlackCat:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Proxy_Emby_BlackCat.yaml
+    type: http
+    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_Emby_BlackCat.list"
+    proxy: DIRECT
+
+  Custom_Proxy_AI:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Proxy_AI.yaml
+    type: http
+    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_AI.list"
+    proxy: DIRECT
+
+  Custom_Proxy_Media:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Proxy_Media.yaml
+    type: http
+    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_Media.list"
+    proxy: DIRECT
+
+  Custom_Direct:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Direct_Classical.yaml
+    type: http
+    url: "https://testingcf.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@main/rule/Custom_Direct_Classical.yaml"
+    proxy: DIRECT
+
+  Custom_Proxy:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Proxy_Classical.yaml
+    type: http
+    url: "https://testingcf.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@main/rule/Custom_Proxy_Classical.yaml"
+    proxy: DIRECT
+
+  Steam_CDN:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Steam_CDN_Classical.yaml
+    type: http
+    url: "https://testingcf.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@main/rule/Steam_CDN_Classical.yaml"
+    proxy: DIRECT
+
+  Custom_Port_Direct:
+    behavior: classical
+    interval: 28800
+    path: ./rule_provider/Custom_Port_Direct.yaml
+    type: http
+    url: "https://testingcf.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@main/rule/Custom_Port_Direct.yaml"
+    proxy: DIRECT
