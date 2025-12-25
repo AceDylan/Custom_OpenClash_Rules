@@ -33,3 +33,6 @@ DOMAIN-SUFFIX,codeium.com
 # 添加域名 windsurf.com
 DOMAIN-SUFFIX,windsurf.com
 
+
+# 添加域名 88code.org
+DOMAIN-SUFFIX,88code.org
