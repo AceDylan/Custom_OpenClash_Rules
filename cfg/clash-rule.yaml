@@ -249,16 +249,16 @@ proxy-groups:
     url: https://www.gstatic.com/generate_204
     interval: 120
     proxies:
-      - "⏫ 专线家宽"
+      - "⏫ 专线"
       - "🇸🇬 新加坡节点"
 
   # 专线家宽 - url-test
-  - name: "⏫ 专线家宽"
+  - name: "⏫ 专线"
     type: url-test
     url: https://www.gstatic.com/generate_204
     interval: 120
     tolerance: 50
-    filter: "(.*?)((?i)香港|日本|新加坡|台湾)(.*?)(IEPL|家宽)"
+    filter: "(.*?)((?i)香港|日本|新加坡|台湾)(.*?)(IEPL|移动)"
     use:
       - provider
 
