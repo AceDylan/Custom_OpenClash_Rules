@@ -258,7 +258,7 @@ proxy-groups:
     url: https://www.gstatic.com/generate_204
     interval: 120
     tolerance: 50
-    filter: "(.*?)((?i)香港|日本|新加坡|台湾)(.*?)(IEPL|移动)"
+    filter: "(.*?)((?i)香港|日本|新加坡|台湾)(.*?)(IEPL|移动|三网|家宽)"
     use:
       - provider
 
