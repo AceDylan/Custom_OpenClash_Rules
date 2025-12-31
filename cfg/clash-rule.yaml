@@ -1,9 +1,3 @@
-# Custom OpenClash Rules - YAML 配置文件
-# 基于 Custom_Clash.ini 转换
-# 作者：https://github.com/Aethersailor
-# 项目地址：https://github.com/Aethersailor/Custom_OpenClash_Rules
-
-# 代理提供者配置
 proxy-providers:
   provider:
     type: http
@@ -31,9 +25,6 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
 
   # 国外媒体
@@ -44,9 +35,6 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
 
   # AI服务
@@ -57,9 +45,6 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
 
   # 流媒体
@@ -70,36 +55,16 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
 
-  # 黑猫
-  - name: "🐱 黑猫"
+  # 油管
+  - name: "📹 油管"
     type: select
     proxies:
       - "🇭🇰 香港节点"
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
-      - "💬 全部地区"
-      - "🎯 全球直连"
-
-  # 油管
-  - name: "📹 油管"
-    type: select
-    proxies:
-      - "🔙 送中组"
-      - "🇺🇸 美国节点"
-      - "🇯🇵 日本节点"
-      - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
 
   # 谷歌服务
@@ -110,9 +75,6 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
       - "🎯 全球直连"
 
@@ -125,9 +87,6 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
 
   # 漏网之鱼
@@ -138,9 +97,6 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
       - "🎯 全球直连"
 
@@ -153,9 +109,6 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
 
   # 测速工具
@@ -167,19 +120,7 @@ proxy-groups:
       - "🇺🇸 美国节点"
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
-      - "🏠 香港自建"
-      - "🏗️ 美国自建"
-      - "📈 保底策略"
       - "💬 全部地区"
-
-  # 送中组 - fallback
-  - name: "🔙 送中组"
-    type: fallback
-    url: https://www.gstatic.com/generate_204
-    interval: 120
-    proxies:
-      - "🔙 送中节点"
-      - "🇸🇬 新加坡节点"
 
   # 香港节点 - url-test
   - name: "🇭🇰 香港节点"
@@ -221,63 +162,12 @@ proxy-groups:
     use:
       - provider
 
-  # 香港自建 - fallback
-  - name: "🏠 香港自建"
-    type: fallback
-    url: https://www.gstatic.com/generate_204
-    interval: 120
-    filter: "BEST"
-    use:
-      - provider
-    proxies:
-      - "🇭🇰 香港节点"
-
-  # 美国自建 - fallback
-  - name: "🏗️ 美国自建"
-    type: fallback
-    url: https://www.gstatic.com/generate_204
-    interval: 120
-    filter: "DMIT"
-    use:
-      - provider
-    proxies:
-      - "🇺🇸 美国节点"
-
-  # 保底策略 - fallback
-  - name: "📈 保底策略"
-    type: fallback
-    url: https://www.gstatic.com/generate_204
-    interval: 120
-    proxies:
-      - "⏫ 专线"
-      - "🇸🇬 新加坡节点"
-
-  # 专线家宽 - url-test
-  - name: "⏫ 专线"
-    type: url-test
-    url: https://www.gstatic.com/generate_204
-    interval: 120
-    tolerance: 50
-    filter: "(.*?)((?i)香港|日本|新加坡|台湾)(.*?)(IEPL|移动|三网|家宽)"
-    use:
-      - provider
-
   # 非标端口
   - name: "🔀 非标端口"
     type: select
     proxies:
       - "🎯 全球直连"
       - "🐟 漏网之鱼"
-
-  # 送中节点 - url-test
-  - name: "🔙 送中节点"
-    type: url-test
-    url: https://www.gstatic.com/generate_204
-    interval: 120
-    tolerance: 50
-    filter: ""
-    use:
-      - provider
 
   # 全部地区
   - name: "💬 全部地区"
@@ -300,8 +190,6 @@ rules:
   - RULE-SET,Custom_Direct_my,🎯 全球直连
   # 流媒体 - Emby
   - RULE-SET,Custom_Proxy_Emby,🎥 流媒体
-  # 黑猫
-  - RULE-SET,Custom_Proxy_Emby_BlackCat,🐱 黑猫
   # AI服务
   - RULE-SET,Custom_Proxy_AI,🤖 AI服务
   # 国外媒体
@@ -402,14 +290,6 @@ rule-providers:
     path: ./rule_provider/Custom_Proxy_Emby.yaml
     type: http
     url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_Emby.list"
-    proxy: DIRECT
-
-  Custom_Proxy_Emby_BlackCat:
-    behavior: classical
-    interval: 28800
-    path: ./rule_provider/Custom_Proxy_Emby_BlackCat.yaml
-    type: http
-    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_Emby_BlackCat.list"
     proxy: DIRECT
 
   Custom_Proxy_AI:
