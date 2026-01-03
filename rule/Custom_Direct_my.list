@@ -115,3 +115,6 @@ IP-CIDR,156.251.183.138/32,no-resolve
 
 # 添加域名 best.acedylan.us
 DOMAIN-SUFFIX,best.acedylan.us
+
+# 添加域名 ms001.uk
+DOMAIN-SUFFIX,ms001.uk
