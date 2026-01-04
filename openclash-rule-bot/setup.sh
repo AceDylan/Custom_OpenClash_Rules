@@ -45,6 +45,7 @@ import os
 import re
 import logging
 import asyncio
+import time
 import traceback
 import nest_asyncio
 import requests
@@ -144,10 +145,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ],
         [
             InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock"),
-            InlineKeyboardButton("🔧 自建节点测试", callback_data="action:self_speedtest")
-        ],
-        [
-            InlineKeyboardButton("🎯 自定义测速", callback_data="action:choice_speedtest")
+            InlineKeyboardButton("📊 带宽速度测试", callback_data="action:bandwidth_speedtest")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -268,7 +266,45 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
     user_input = update.message.text.strip()
     user_id = update.effective_user.id
-    
+
+    # 处理带宽测速 URL 输入
+    if user_id in user_states and user_states[user_id].get("action") == "bandwidth_waiting_url":
+        # 用户输入"取消"返回主菜单
+        if user_input == "取消":
+            user_states.pop(user_id, None)
+            await start(update, context)
+            return
+
+        # 校验 URL 格式
+        if not (user_input.startswith("http://") or user_input.startswith("https://")):
+            keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="action:start")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "❌ URL 格式不正确，请发送以 http:// 或 https:// 开头的 URL。\n\n"
+                "发送「取消」或点击按钮返回主菜单。",
+                reply_markup=reply_markup
+            )
+            return
+
+        # URL 长度校验（防止过长输入）
+        if len(user_input) > 2000:
+            keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="action:start")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "❌ URL 过长，请检查输入。",
+                reply_markup=reply_markup
+            )
+            return
+
+        # 清除用户状态，开始测速
+        user_states.pop(user_id, None)
+        progress_message = await update.message.reply_text("⏳ 已收到 URL，正在启动测速，请稍候...")
+
+        # 创建消息代理以便在 run_bandwidth_speedtest 中编辑消息
+        proxy = MessageEditProxy(progress_message, update.effective_user)
+        await run_bandwidth_speedtest(proxy, user_input)
+        return
+
     # 处理搜索输入
     if user_id in user_states and user_states[user_id].get("action") == "search_waiting":
         await handle_search_input(update, context, user_input)
@@ -667,7 +703,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     user_id = update.effective_user.id
-    if user_id not in user_states and not query.data.startswith("action:") and not query.data.startswith("youtube_unlock:") and not query.data.startswith("self_speedtest:") and not query.data.startswith("choice_speedtest:"):
+    if user_id not in user_states and not query.data.startswith("action:") and not query.data.startswith("youtube_unlock:"):
         await query.edit_message_text("⏱️ 会话已过期，请重新开始。")
         return
 
@@ -747,7 +783,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
             return
         elif action == "start":
-            # 返回主菜单
+            # 返回主菜单，清除用户状态
+            user_states.pop(user_id, None)
+
             keyboard = [
                 [InlineKeyboardButton("➕ 添加规则", callback_data="action:add")],
                 [InlineKeyboardButton("👁️ 查看规则", callback_data="action:view")],
@@ -757,8 +795,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")],
                 [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")],
                 [InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")],
-                [InlineKeyboardButton("🔧 自建节点测试", callback_data="action:self_speedtest")],
-                [InlineKeyboardButton("🎯 自定义测速", callback_data="action:choice_speedtest")]
+                [InlineKeyboardButton("📊 带宽速度测试", callback_data="action:bandwidth_speedtest")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -782,11 +819,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif action == "youtube_unlock":
             await show_youtube_unlock_options(query)
             return
-        elif action == "self_speedtest":
-            await run_self_speedtest(query)
-            return
-        elif action == "choice_speedtest":
-            await run_choice_speedtest(query)
+        elif action == "bandwidth_speedtest":
+            # 设置用户状态为等待 URL 输入
+            user_states[user_id] = {"action": "bandwidth_waiting_url"}
+            keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="action:start")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                "📊 *带宽速度测试*\n\n"
+                "请发送测速配置 URL（必须以 http:// 或 https:// 开头）。\n\n"
+                "发送「取消」或点击下方按钮返回主菜单。",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
             return
 
     # 添加规则
@@ -1655,40 +1699,73 @@ async def clear_connections(query):
             reply_markup=reply_markup
         )
 
-# 自建节点测试相关配置
-SELF_SPEEDTEST_URL = "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/collection/All-SELF?target=ClashMeta"
-SELF_SPEEDTEST_RESULT_FILE = "/root/clash-speedtest/self_speedtest.txt"
+# 带宽速度测试相关配置
+BANDWIDTH_SPEEDTEST_WORK_DIR = "/root/clash-speedtest"
 
-# 自定义测速相关配置
-CHOICE_SPEEDTEST_URL = "http://192.168.6.1:3001/QPOI09-8ld35ffa25ha2/download/collection/All-CHOICE?target=ClashMeta"
-CHOICE_SPEEDTEST_RESULT_FILE = "/root/clash-speedtest/choice_speedtest.txt"
 
-async def run_self_speedtest(query):
-    """执行自建节点测试"""
+class MessageEditProxy:
+    """消息编辑代理类，用于统一处理来自 CallbackQuery 和 Message 的消息编辑"""
+
+    def __init__(self, message, from_user):
+        self._message = message
+        self.from_user = from_user
+
+    async def edit_message_text(self, text, **kwargs):
+        """编辑消息文本"""
+        return await self._message.edit_text(text, **kwargs)
+
+
+async def run_bandwidth_speedtest(query, url):
+    """执行带宽速度测试（用户输入 URL）
+
+    Args:
+        query: CallbackQuery 对象或 MessageEditProxy 代理对象
+        url: 用户提供的测速配置 URL
+    """
     try:
+        # 二次校验 URL 格式（防御性编程）
+        if not (url.startswith("http://") or url.startswith("https://")):
+            keyboard = [
+                [InlineKeyboardButton("📊 重新输入URL", callback_data="action:bandwidth_speedtest")],
+                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                "❌ URL 格式不正确，请发送以 http:// 或 https:// 开头的 URL。",
+                reply_markup=reply_markup
+            )
+            return
+
+        # 生成唯一的输出文件名（避免并发冲突）
+        user_id = getattr(getattr(query, "from_user", None), "id", "unknown")
+        timestamp_ms = int(time.time() * 1000)
+        output_filename = f"bandwidth_speedtest_{user_id}_{timestamp_ms}.txt"
+        output_path = os.path.join(BANDWIDTH_SPEEDTEST_WORK_DIR, output_filename)
+
+        # 确保工作目录存在
+        os.makedirs(BANDWIDTH_SPEEDTEST_WORK_DIR, exist_ok=True)
+
         await query.edit_message_text(
-            "⏳ 正在进行 *自建节点测试*...\n\n"
+            "⏳ 正在进行 *带宽速度测试*...\n\n"
             "🔄 正在下载配置并执行测试，请耐心等待...\n"
             "（此过程可能需要几分钟）",
             parse_mode='Markdown'
         )
 
-        # 执行测试命令
-        work_dir = "/root/clash-speedtest"
-        cmd = ["go", "run", "main.go", "-c", SELF_SPEEDTEST_URL, "-txt", "self_speedtest.txt"]
-
-        logger.info(f"开始执行自建节点测试: cmd={cmd}, work_dir={work_dir}")
+        # 构建命令（使用参数数组防止命令注入）
+        cmd = ["go", "run", "main.go", "-c", url, "-txt", output_filename]
+        logger.info(f"开始执行带宽速度测试: url={url}, cmd={cmd}, work_dir={BANDWIDTH_SPEEDTEST_WORK_DIR}")
 
         try:
             # 运行命令，设置超时时间为30分钟
             process = await asyncio.create_subprocess_exec(
                 *cmd,
-                cwd=work_dir,
+                cwd=BANDWIDTH_SPEEDTEST_WORK_DIR,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
 
-            logger.info(f"进程已创建，等待执行完成...")
+            logger.info("进程已创建，等待执行完成...")
 
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(),
@@ -1705,16 +1782,16 @@ async def run_self_speedtest(query):
 
             if process.returncode != 0:
                 error_msg = stderr_text if stderr_text else "未知错误"
-                logger.error(f"自建节点测试命令执行失败: {error_msg}")
+                logger.error(f"带宽速度测试命令执行失败: {error_msg}")
 
                 keyboard = [
-                    [InlineKeyboardButton("🔄 重新测试", callback_data="action:self_speedtest")],
+                    [InlineKeyboardButton("📊 再测一次", callback_data="action:bandwidth_speedtest")],
                     [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
                 await query.edit_message_text(
-                    f"❌ 自建节点测试失败\n\n"
+                    f"❌ 带宽速度测试失败\n\n"
                     f"错误信息: {error_msg[:500]}",
                     parse_mode='Markdown',
                     reply_markup=reply_markup
@@ -1730,24 +1807,25 @@ async def run_self_speedtest(query):
                 pass
 
             keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:self_speedtest")],
+                [InlineKeyboardButton("📊 再测一次", callback_data="action:bandwidth_speedtest")],
                 [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await query.edit_message_text(
-                "⏰ 自建节点测试超时\n\n"
+                "⏰ 带宽速度测试超时\n\n"
                 "测试时间超过30分钟，请稍后重试",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
             return
+
         except Exception as cmd_error:
             error_details = traceback.format_exc()
-            logger.error(f"执行自建节点测试命令时发生错误: {str(cmd_error)}\n{error_details}")
+            logger.error(f"执行带宽速度测试命令时发生错误: {str(cmd_error)}\n{error_details}")
 
             keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:self_speedtest")],
+                [InlineKeyboardButton("📊 再测一次", callback_data="action:bandwidth_speedtest")],
                 [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1761,240 +1839,33 @@ async def run_self_speedtest(query):
             return
 
         # 等待文件系统同步
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
         # 读取结果文件
         result_content = ""
-        logger.info(f"检查结果文件: {SELF_SPEEDTEST_RESULT_FILE}")
-
-        if os.path.exists(SELF_SPEEDTEST_RESULT_FILE):
-            # 获取文件大小
-            file_size = os.path.getsize(SELF_SPEEDTEST_RESULT_FILE)
+        if os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
             logger.info(f"结果文件存在，大小: {file_size} bytes")
 
-            with open(SELF_SPEEDTEST_RESULT_FILE, 'r', encoding='utf-8') as f:
+            with open(output_path, 'r', encoding='utf-8') as f:
                 result_content = f.read()
 
             logger.info(f"从文件读取到内容长度: {len(result_content)}")
         else:
-            logger.warning(f"结果文件不存在: {SELF_SPEEDTEST_RESULT_FILE}")
+            logger.warning(f"结果文件不存在: {output_path}")
 
         # 如果文件为空或不存在，尝试从 stdout 提取结果
-        if not result_content.strip():
-            logger.warning("结果文件为空或不存在，尝试从命令输出中提取结果")
-            # 解析 stdout 中的结果表格
-            if stdout_text:
-                lines = stdout_text.strip().split('\n')
-                result_lines = []
-                for line in lines:
-                    line = line.strip()
-                    # 跳过标题行和空行
-                    if not line or line.startswith('Clash Speedtest') or line.startswith('序号'):
-                        continue
-                    # 检查是否是数据行（以数字开头，如 "1." 或 "12."）
-                    import re as re_module
-                    if re_module.match(r'^\d+\.', line):
-                        result_lines.append(line)
-                if result_lines:
-                    result_content = '\n'.join(result_lines)
-                    logger.info(f"从stdout提取到 {len(result_lines)} 行结果")
-                else:
-                    logger.warning("无法从stdout提取结果行")
+        if not result_content.strip() and stdout_text:
+            logger.warning("结果文件为空或不存在，使用命令输出作为结果")
+            result_content = stdout_text
 
-        # 显示结果
-        if result_content.strip():
-            # Telegram 消息有字数限制，截断过长的内容
-            display_content = result_content.strip()
-            if len(display_content) > 3000:
-                display_content = display_content[:3000] + "\n\n... (结果过长已截断)"
-
-            # 记录要显示的内容
-            logger.info(f"准备显示的内容前100字符: {display_content[:100]}")
-
-            keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:self_speedtest")],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            # 使用 HTML 格式，避免 Markdown 解析问题
-            # 转义 HTML 特殊字符
-            html_content = display_content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-
-            await query.edit_message_text(
-                f"✅ <b>自建节点测试完成</b>\n\n"
-                f"📋 <b>测试结果:</b>\n"
-                f"<pre>{html_content}</pre>",
-                parse_mode='HTML',
-                reply_markup=reply_markup
-            )
-        else:
-            keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:self_speedtest")],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.edit_message_text(
-                "⚠️ 自建节点测试完成，但未能获取结果\n\n"
-                "请检查 self_speedtest.txt 文件是否生成",
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-
-    except Exception as e:
-        error_details = traceback.format_exc()
-        logger.error(f"自建节点测试时发生错误: {str(e)}\n{error_details}")
-
+        # 构建返回按钮
         keyboard = [
-            [InlineKeyboardButton("🔄 重新测试", callback_data="action:self_speedtest")],
+            [InlineKeyboardButton("📊 再测一次", callback_data="action:bandwidth_speedtest")],
             [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(
-            f"❌ 测试失败: {str(e)}",
-            reply_markup=reply_markup
-        )
-
-async def run_choice_speedtest(query):
-    """执行自定义测速"""
-    try:
-        await query.edit_message_text(
-            "⏳ 正在进行 *自定义测速*...\n\n"
-            "🔄 正在下载配置并执行测试，请耐心等待...\n"
-            "（此过程可能需要几分钟）",
-            parse_mode='Markdown'
-        )
-
-        # 执行测试命令
-        work_dir = "/root/clash-speedtest"
-        cmd = ["go", "run", "main.go", "-c", CHOICE_SPEEDTEST_URL, "-txt", "choice_speedtest.txt"]
-
-        logger.info(f"开始执行自定义测速: cmd={cmd}, work_dir={work_dir}")
-
-        try:
-            # 运行命令，设置超时时间为30分钟
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                cwd=work_dir,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-
-            logger.info(f"进程已创建，等待执行完成...")
-
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=1800  # 30分钟超时
-            )
-
-            stdout_text = stdout.decode('utf-8', errors='ignore') if stdout else ""
-            stderr_text = stderr.decode('utf-8', errors='ignore') if stderr else ""
-
-            logger.info(f"命令执行完成: returncode={process.returncode}")
-            logger.info(f"命令输出 stdout:\n{stdout_text[:2000]}")
-            if stderr_text:
-                logger.info(f"命令输出 stderr:\n{stderr_text[:2000]}")
-
-            if process.returncode != 0:
-                error_msg = stderr_text if stderr_text else "未知错误"
-                logger.error(f"自定义测速命令执行失败: {error_msg}")
-
-                keyboard = [
-                    [InlineKeyboardButton("🔄 重新测试", callback_data="action:choice_speedtest")],
-                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-
-                await query.edit_message_text(
-                    f"❌ 自定义测速失败\n\n"
-                    f"错误信息: {error_msg[:500]}",
-                    parse_mode='Markdown',
-                    reply_markup=reply_markup
-                )
-                return
-
-        except asyncio.TimeoutError:
-            # 超时时终止子进程，避免僵尸进程
-            try:
-                process.terminate()
-                await process.wait()
-            except Exception:
-                pass
-
-            keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:choice_speedtest")],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.edit_message_text(
-                "⏰ 自定义测速超时\n\n"
-                "测试时间超过30分钟，请稍后重试",
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-            return
-        except Exception as cmd_error:
-            error_details = traceback.format_exc()
-            logger.error(f"执行自定义测速命令时发生错误: {str(cmd_error)}\n{error_details}")
-
-            keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:choice_speedtest")],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.edit_message_text(
-                f"❌ 执行测试命令失败\n\n"
-                f"错误: {str(cmd_error)[:300]}",
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-            return
-
-        # 等待文件系统同步
-        await asyncio.sleep(3)
-
-        # 读取结果文件
-        result_content = ""
-        logger.info(f"检查结果文件: {CHOICE_SPEEDTEST_RESULT_FILE}")
-
-        if os.path.exists(CHOICE_SPEEDTEST_RESULT_FILE):
-            # 获取文件大小
-            file_size = os.path.getsize(CHOICE_SPEEDTEST_RESULT_FILE)
-            logger.info(f"结果文件存在，大小: {file_size} bytes")
-
-            with open(CHOICE_SPEEDTEST_RESULT_FILE, 'r', encoding='utf-8') as f:
-                result_content = f.read()
-
-            logger.info(f"从文件读取到内容长度: {len(result_content)}")
-        else:
-            logger.warning(f"结果文件不存在: {CHOICE_SPEEDTEST_RESULT_FILE}")
-
-        # 如果文件为空或不存在，尝试从 stdout 提取结果
-        if not result_content.strip():
-            logger.warning("结果文件为空或不存在，尝试从命令输出中提取结果")
-            # 解析 stdout 中的结果表格
-            if stdout_text:
-                lines = stdout_text.strip().split('\n')
-                result_lines = []
-                for line in lines:
-                    line = line.strip()
-                    # 跳过标题行和空行
-                    if not line or line.startswith('Clash Speedtest') or line.startswith('序号'):
-                        continue
-                    # 检查是否是数据行（以数字开头，如 "1." 或 "12."）
-                    import re as re_module
-                    if re_module.match(r'^\d+\.', line):
-                        result_lines.append(line)
-                if result_lines:
-                    result_content = '\n'.join(result_lines)
-                    logger.info(f"从stdout提取到 {len(result_lines)} 行结果")
-                else:
-                    logger.warning("无法从stdout提取结果行")
-
         # 显示结果
         if result_content.strip():
             # Telegram 消息有字数限制，截断过长的内容
@@ -2002,46 +1873,40 @@ async def run_choice_speedtest(query):
             if len(display_content) > 3000:
                 display_content = display_content[:3000] + "\n\n... (结果过长已截断)"
 
-            # 记录要显示的内容
             logger.info(f"准备显示的内容前100字符: {display_content[:100]}")
 
-            keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:choice_speedtest")],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
             # 使用 HTML 格式，避免 Markdown 解析问题
-            # 转义 HTML 特殊字符
             html_content = display_content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
             await query.edit_message_text(
-                f"✅ <b>自定义测速完成</b>\n\n"
+                f"✅ <b>带宽速度测试完成</b>\n\n"
                 f"📋 <b>测试结果:</b>\n"
                 f"<pre>{html_content}</pre>",
                 parse_mode='HTML',
                 reply_markup=reply_markup
             )
         else:
-            keyboard = [
-                [InlineKeyboardButton("🔄 重新测试", callback_data="action:choice_speedtest")],
-                [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
             await query.edit_message_text(
-                "⚠️ 自定义测速完成，但未能获取结果\n\n"
-                "请检查 choice_speedtest.txt 文件是否生成",
+                f"⚠️ 带宽速度测试完成，但未能获取结果\n\n"
+                f"请检查 {output_filename} 文件是否生成",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
 
+        # 清理临时文件
+        try:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+                logger.info(f"已清理临时文件: {output_path}")
+        except Exception as cleanup_error:
+            logger.warning(f"清理临时文件失败: {cleanup_error}")
+
     except Exception as e:
         error_details = traceback.format_exc()
-        logger.error(f"自定义测速时发生错误: {str(e)}\n{error_details}")
+        logger.error(f"带宽速度测试时发生错误: {str(e)}\n{error_details}")
 
         keyboard = [
-            [InlineKeyboardButton("🔄 重新测试", callback_data="action:choice_speedtest")],
+            [InlineKeyboardButton("📊 再测一次", callback_data="action:bandwidth_speedtest")],
             [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
