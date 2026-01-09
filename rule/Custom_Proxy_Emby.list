@@ -62,3 +62,6 @@ DOMAIN-SUFFIX,kr6.emby.bid
 
 # 添加域名 uk.emby.trade
 DOMAIN-SUFFIX,uk.emby.trade
+
+# 添加域名 kr.emby.loan
+DOMAIN-SUFFIX,kr.emby.loan
