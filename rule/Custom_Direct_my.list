@@ -74,8 +74,6 @@ DOMAIN-SUFFIX,mail.td
 
 
 
-# 添加域名 www.afusekt.cn
-DOMAIN-SUFFIX,www.afusekt.cn
 
 # 添加IP 103.120.89.208
 IP-CIDR,103.120.89.208/32,no-resolve

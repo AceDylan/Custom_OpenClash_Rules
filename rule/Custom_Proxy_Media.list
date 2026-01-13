@@ -52,3 +52,6 @@ DOMAIN-SUFFIX,dmit.io
 
 # 添加域名 bestvm.cloud
 DOMAIN-SUFFIX,bestvm.cloud
+
+# 添加域名 www.afusekt.cn
+DOMAIN-SUFFIX,www.afusekt.cn
