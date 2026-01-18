@@ -237,14 +237,26 @@ function operator(pro) {
 
     // 正则 匹配倍率
     if (bl) {
-      const match = e.name.match(
-        /((倍率|X|x|×|B|b)\D?((\d{1,3}\.)?\d+)\D?)|((\d{1,3}\.)?\d+)(倍|X|x|×|B|b)/
+      // 特例: "01 x 0.2" -> "0.2× 01" (保留序号)
+      const seqRateMatch = e.name.match(
+        /(?:^|\s)(\d{2})\s*(?:X|x|×)\s*((\d{1,3}\.)?\d+)(?=\s|$)/
       );
-      if (match) {
-        const rev = match[0].match(/(\d[\d.]*)/)[0];
+      if (seqRateMatch) {
+        const seq = seqRateMatch[1];
+        const rev = seqRateMatch[2];
         if (rev !== "1") {
-          const newValue = rev + "×";
-          ikey = newValue;
+          ikey = rev + "× " + seq;
+        }
+      } else {
+        const match = e.name.match(
+          /((倍率|X|x|×|B|b)\D?((\d{1,3}\.)?\d+)\D?)|((\d{1,3}\.)?\d+)(倍|X|x|×|B|b)/
+        );
+        if (match) {
+          const rev = match[0].match(/(\d[\d.]*)/)[0];
+          if (rev !== "1") {
+            const newValue = rev + "×";
+            ikey = newValue;
+          }
         }
       }
     }
