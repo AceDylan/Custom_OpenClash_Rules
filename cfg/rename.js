@@ -237,15 +237,14 @@ function operator(pro) {
 
     // 正则 匹配倍率
     if (bl) {
-      // 特例: "01 x 0.2" -> "0.2× 01" (保留序号)
-      const seqRateMatch = e.name.match(
-        /(?:^|\s)(\d{2})\s*(?:X|x|×)\s*((\d{1,3}\.)?\d+)(?=\s|$)/
-      );
+      // 特例: "01 x 0.2" -> "0.2×" (序号由jxh生成)
+      const seqRateRegex = /(^|[^\d])(\d{2})[\s\u200B]*(?:X|x|×)[\s\u200B]*((\d{1,3}\.)?\d+)(?=$|[^\d.])/;
+      const seqRateMatch = e.name.match(seqRateRegex);
       if (seqRateMatch) {
-        const seq = seqRateMatch[1];
-        const rev = seqRateMatch[2];
+        const rev = seqRateMatch[3];
         if (rev !== "1") {
-          ikey = rev + "× " + seq;
+          e.name = e.name.replace(seqRateRegex, (m, prefix, seq, r) => `${prefix}${r}×`);
+          ikey = rev + "×";
         }
       } else {
         const match = e.name.match(
