@@ -280,7 +280,19 @@ function operator(pro) {
       e.name = keyover.join(FGF);
     } else {
       if (nm) {
-        e.name = FNAME + FGF + e.name;
+        // 提取倍率信息
+        let nmRate = "";
+        if (bl) {
+          const match = e.name.match(/((倍率|X|x|×|B|b)\D?((\d{1,3}\.)?\d+)\D?)|((\d{1,3}\.)?\d+)(倍|X|x|×|B|b)/);
+          if (match) {
+            const rev = match[0].match(/(\d[\d.]*)/)[0];
+            nmRate = rev + "×";
+          }
+        }
+        // 清理原名中的倍率和emoji
+        let cleanName = e.name.replace(/\s*(x|X|×)\s*[\d.]+|\s*[\d.]+(x|X|×)/g, "").replace(/🎬\s*/g, "").trim();
+        let parts = [FNAME, cleanName, nmRate].filter((p) => p !== "");
+        e.name = parts.join(FGF);
         e._skipJxh = true;
       } else {
         e.name = null;
