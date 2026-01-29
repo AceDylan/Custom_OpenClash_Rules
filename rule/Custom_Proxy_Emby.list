@@ -25,43 +25,14 @@ DOMAIN-SUFFIX,xmsl.org
 # 添加域名 cflocal.xxlb.net
 DOMAIN-SUFFIX,cflocal.xxlb.net
 
-
 # 添加域名 gyplay.xxlb.net
 DOMAIN-SUFFIX,gyplay.xxlb.net
 
 # 添加域名 alphatvx.alphatvapp.top
 DOMAIN-SUFFIX,alphatvx.alphatvapp.top
 
-
 # 添加域名 vban.xyz
 DOMAIN-SUFFIX,vban.xyz
 
-# 添加域名 as.emby.bid
-DOMAIN-SUFFIX,as.emby.bid
-
-# 添加域名 nure2.emby.bid
-DOMAIN-SUFFIX,nure2.emby.bid
-
-
-
-# 添加域名 hk.emby.bid
-DOMAIN-SUFFIX,hk.emby.bid
-
-
 # 添加IP 107.181.238.190
 IP-CIDR,107.181.238.190/32,no-resolve
-
-# 添加域名 sg.emby.bid
-DOMAIN-SUFFIX,sg.emby.bid
-
-# 添加域名 hk.emby.loan
-DOMAIN-SUFFIX,hk.emby.loan
-
-# 添加域名 kr6.emby.bid
-DOMAIN-SUFFIX,kr6.emby.bid
-
-# 添加域名 uk.emby.trade
-DOMAIN-SUFFIX,uk.emby.trade
-
-# 添加域名 kr.emby.loan
-DOMAIN-SUFFIX,kr.emby.loan
