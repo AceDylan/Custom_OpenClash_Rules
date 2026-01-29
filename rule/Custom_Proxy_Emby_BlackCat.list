@@ -1,16 +1,20 @@
-# 添加域名 fr.emby.date
-DOMAIN-SUFFIX,fr.emby.date
-
+# 添加域名 a111.sbs
+DOMAIN-SUFFIX,a111.sbs
 
 # 添加域名 uuuoo.cc
 DOMAIN-SUFFIX,uuuoo.cc
 
-# 添加域名 8.trkp.cc
-DOMAIN-SUFFIX,8.trkp.cc
+# 添加域名 trkp.cc
+DOMAIN-SUFFIX,trkp.cc
 
+# 添加域名 emby.bid
+DOMAIN-SUFFIX,emby.bid
 
-# 添加域名 sgx.emby.bid
-DOMAIN-SUFFIX,sgx.emby.bid
+# 添加域名 emby.date
+DOMAIN-SUFFIX,emby.date
 
-# 添加域名 8.emby.date
-DOMAIN-SUFFIX,8.emby.date
+# 添加域名 emby.trade
+DOMAIN-SUFFIX,emby.trade
+
+# 添加域名 emby.loan
+DOMAIN-SUFFIX,emby.loan
