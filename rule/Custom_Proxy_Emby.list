@@ -39,3 +39,6 @@ IP-CIDR,107.181.238.190/32,no-resolve
 
 # 添加域名 six.sixsixsix.site
 DOMAIN-SUFFIX,six.sixsixsix.site
+
+# 添加域名 a.drama666.top
+DOMAIN-SUFFIX,a.drama666.top
