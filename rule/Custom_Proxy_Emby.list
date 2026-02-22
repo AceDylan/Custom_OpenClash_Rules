@@ -36,3 +36,6 @@ DOMAIN-SUFFIX,vban.xyz
 
 # 添加IP 107.181.238.190
 IP-CIDR,107.181.238.190/32,no-resolve
+
+# 添加域名 six.sixsixsix.site
+DOMAIN-SUFFIX,six.sixsixsix.site
