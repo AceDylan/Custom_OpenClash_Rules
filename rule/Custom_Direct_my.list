@@ -115,3 +115,6 @@ DOMAIN-SUFFIX,best.acedylan.us
 
 # 添加域名 ms001.uk
 DOMAIN-SUFFIX,ms001.uk
+
+# 添加域名 ocsp.digicert.com
+DOMAIN-SUFFIX,ocsp.digicert.com
