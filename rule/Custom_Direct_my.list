@@ -116,3 +116,9 @@ DOMAIN-SUFFIX,best.acedylan.us
 # 添加域名 ms001.uk
 DOMAIN-SUFFIX,ms001.uk
 
+DOMAIN-SUFFIX,goskope.com
+DOMAIN-SUFFIX,tizen.org
+DOMAIN-SUFFIX,digicert.com
+DOMAIN-SUFFIX,collegeboard.org
+DOMAIN-SUFFIX,lencr.org
+
