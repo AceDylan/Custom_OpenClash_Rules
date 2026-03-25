@@ -27,26 +27,6 @@ proxy-groups:
       - "🇸🇬 新加坡节点"
       - "💬 全部地区"
 
-  # 国外媒体
-  - name: "🌎 国外媒体"
-    type: select
-    proxies:
-      - "🇭🇰 香港节点"
-      - "🇺🇸 美国节点"
-      - "🇯🇵 日本节点"
-      - "🇸🇬 新加坡节点"
-      - "💬 全部地区"
-
-  # AI服务
-  - name: "🤖 AI服务"
-    type: select
-    proxies:
-      - "🇭🇰 香港节点"
-      - "🇺🇸 美国节点"
-      - "🇯🇵 日本节点"
-      - "🇸🇬 新加坡节点"
-      - "💬 全部地区"
-
   # 流媒体
   - name: "🎥 流媒体"
     type: select
@@ -56,6 +36,7 @@ proxy-groups:
       - "🇯🇵 日本节点"
       - "🇸🇬 新加坡节点"
       - "💬 全部地区"
+      - "🎯 全球直连"
 
   # 油管
   - name: "📹 油管"
@@ -67,8 +48,8 @@ proxy-groups:
       - "🇸🇬 新加坡节点"
       - "💬 全部地区"
 
-  # 谷歌服务
-  - name: "🇬 谷歌服务"
+  # 谷歌与AI
+  - name: "🇬 谷歌与AI"
     type: select
     proxies:
       - "🇭🇰 香港节点"
@@ -184,16 +165,14 @@ proxy-groups:
 
 # 规则配置
 rules:
-  # 谷歌服务 - 自定义规则
-  - RULE-SET,Custom_Proxy_Google,🇬 谷歌服务
+  # 谷歌与AI - 自定义规则（含AI服务）
+  - RULE-SET,Custom_Proxy_Google,🇬 谷歌与AI
   # 自定义直连
   - RULE-SET,Custom_Direct_my,🎯 全球直连
   # 流媒体 - Emby
   - RULE-SET,Custom_Proxy_Emby,🎥 流媒体
-  # AI服务
-  - RULE-SET,Custom_Proxy_AI,🤖 AI服务
-  # 国外媒体
-  - RULE-SET,Custom_Proxy_Media,🌎 国外媒体
+  # 社交媒体
+  - RULE-SET,Custom_Proxy_Media,💬 社交媒体
   # 本地地址直连
   - GEOSITE,private,🎯 全球直连
   - GEOIP,private,🎯 全球直连,no-resolve
@@ -202,7 +181,7 @@ rules:
   # 本项目收录的直连域名规则
   - RULE-SET,Custom_Direct,🎯 全球直连
   # 本项目收录的代理域名规则
-  - RULE-SET,Custom_Proxy,🌎 国外媒体
+  - RULE-SET,Custom_Proxy,💬 社交媒体
   # 谷歌在国内可用的域名强制直连
   - GEOSITE,google-cn,🎯 全球直连
   # 国内游戏域名强制直连
@@ -218,11 +197,11 @@ rules:
   # 社交媒体 (Twitter/Facebook/Instagram 等)
   - GEOSITE,category-social-media-!cn,💬 社交媒体
   # AI 服务
-  - GEOSITE,openai,🤖 AI服务
-  - GEOSITE,bing,🤖 AI服务
-  - GEOSITE,category-ai-!cn,🤖 AI服务
+  - GEOSITE,openai,🇬 谷歌与AI
+  - GEOSITE,bing,🇬 谷歌与AI
+  - GEOSITE,category-ai-!cn,🇬 谷歌与AI
   # GitHub
-  - GEOSITE,github,🌎 国外媒体
+  - GEOSITE,github,💬 社交媒体
   # 测速工具
   - GEOSITE,category-speedtest,🚀 测速工具
   # YouTube
@@ -232,9 +211,9 @@ rules:
   # 微软/苹果服务
   - GEOSITE,apple,Ⓜ️ 微软服务
   - GEOSITE,microsoft,Ⓜ️ 微软服务
-  # 谷歌服务
-  - GEOSITE,googlefcm,🇬 谷歌服务
-  - GEOSITE,google,🇬 谷歌服务
+  # 谷歌与AI
+  - GEOSITE,googlefcm,🇬 谷歌与AI
+  - GEOSITE,google,🇬 谷歌与AI
   # 流媒体
   - GEOSITE,tiktok,🎥 流媒体
   - GEOSITE,netflix,🎥 流媒体
@@ -242,21 +221,21 @@ rules:
   - GEOSITE,hbo,🎥 流媒体
   - GEOSITE,primevideo,🎥 流媒体
   - GEOSITE,category-emby,🎥 流媒体
-  # 国外媒体
-  - GEOSITE,spotify,🌎 国外媒体
-  - GEOSITE,bahamut,🌎 国外媒体
+  # 社交媒体
+  - GEOSITE,spotify,💬 社交媒体
+  - GEOSITE,bahamut,💬 社交媒体
   # 游戏
   - GEOSITE,steam,🎮 游戏
   - GEOSITE,category-games,🎮 游戏
-  # 国外媒体/电商
-  - GEOSITE,category-entertainment,🌎 国外媒体
-  - GEOSITE,category-ecommerce,🌎 国外媒体
-  - GEOSITE,gfw,🌎 国外媒体
+  # 社交媒体/电商
+  - GEOSITE,category-entertainment,💬 社交媒体
+  - GEOSITE,category-ecommerce,💬 社交媒体
+  - GEOSITE,gfw,💬 社交媒体
   # GEOIP 规则
   - GEOIP,telegram,🎥 流媒体,no-resolve
   - GEOIP,twitter,💬 社交媒体,no-resolve
   - GEOIP,facebook,💬 社交媒体,no-resolve
-  - GEOIP,google,🇬 谷歌服务,no-resolve
+  - GEOIP,google,🇬 谷歌与AI,no-resolve
   - GEOIP,netflix,🎥 流媒体,no-resolve
   # 国内域名/IP 兜底
   - GEOSITE,cn,🎯 全球直连
@@ -290,14 +269,6 @@ rule-providers:
     path: ./rule_provider/Custom_Proxy_Emby.yaml
     type: http
     url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_Emby.list"
-    proxy: DIRECT
-
-  Custom_Proxy_AI:
-    behavior: classical
-    interval: 28800
-    path: ./rule_provider/Custom_Proxy_AI.yaml
-    type: http
-    url: "https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/rule/Custom_Proxy_AI.list"
     proxy: DIRECT
 
   Custom_Proxy_Media:

@@ -73,32 +73,26 @@ AUTHORIZED_USER_ID = "${AUTHORIZED_USER_ID}"
 
 # 规则文件列表
 RULE_FILES = {
-    "ai": "rule/Custom_Proxy_AI.list",
     "direct": "rule/Custom_Direct_my.list",
     "emby": "rule/Custom_Proxy_Emby.list",
     "media": "rule/Custom_Proxy_Media.list",
-    "google": "rule/Custom_Proxy_Google.list",
-    "blackcat": "rule/Custom_Proxy_Emby_BlackCat.list"
+    "google": "rule/Custom_Proxy_Google.list"
 }
 
 # 规则文件与OpenClash规则名称映射
 OPENCLASH_RULE_MAPPING = {
-    "rule/Custom_Proxy_AI.list": "Custom_Proxy_AI",
     "rule/Custom_Direct_my.list": "Custom_Direct_my",
     "rule/Custom_Proxy_Emby.list": "Custom_Proxy_Emby",
     "rule/Custom_Proxy_Media.list": "Custom_Proxy_Media",
-    "rule/Custom_Proxy_Google.list": "Custom_Proxy_Google",
-    "rule/Custom_Proxy_Emby_BlackCat.list": "Custom_Proxy_Emby_BlackCat"
+    "rule/Custom_Proxy_Google.list": "Custom_Proxy_Google"
 }
 
 # 规则文件对应的显示名称
 RULE_FILE_NAMES = {
-    "ai": "🤖 AI代理规则",
     "direct": "🏠 直连规则",
     "emby": "🎬 Emby代理规则",
-    "media": "📺 国外媒体代理规则",
-    "google": "🔍 Google代理规则",
-    "blackcat": "🐈‍⬛ 黑猫Emby规则"
+    "media": "💬 社交媒体代理规则",
+    "google": "🇬 谷歌与AI代理规则"
 }
 
 # 用户状态存储
@@ -227,12 +221,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "- 点击更新全部规则按钮\n"
         "- 机器人会依次刷新所有OpenClash规则\n\n"
         "📋 *支持的规则文件：*\n"
-        "• 🤖 AI代理规则 (Custom_Proxy_AI.list)\n"
         "• 🏠 直连规则 (Custom_Direct_my.list)\n"
         "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
-        "• 📺 国外媒体代理规则 (Custom_Proxy_Media.list)\n"
-        "• 🔍 Google代理规则 (Custom_Proxy_Google.list)\n"
-        "• 🐈‍⬛ 黑猫Emby规则 (Custom_Proxy_Emby_BlackCat.list)\n\n"
+        "• 💬 社交媒体代理规则 (Custom_Proxy_Media.list)\n"
+        "• 🇬 谷歌与AI代理规则 (Custom_Proxy_Google.list)\n\n"
         "🧹 *清空连接：*\n"
         "- 点击清空连接按钮\n"
         "- 机器人会调用OpenClash API清空所有当前连接",
@@ -777,12 +769,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "- 点击更新全部规则按钮\n"
                 "- 机器人会依次刷新所有OpenClash规则\n\n"
                 "📋 *支持的规则文件：*\n"
-                "• 🤖 AI代理规则 (Custom_Proxy_AI.list)\n"
                 "• 🏠 直连规则 (Custom_Direct_my.list)\n"
                 "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
-                "• 📺 国外媒体代理规则 (Custom_Proxy_Media.list)\n"
-                "• 🔍 Google代理规则 (Custom_Proxy_Google.list)\n"
-                "• 🐈‍⬛ 黑猫Emby规则 (Custom_Proxy_Emby_BlackCat.list)",
+                "• 💬 社交媒体代理规则 (Custom_Proxy_Media.list)\n"
+                "• 🇬 谷歌与AI代理规则 (Custom_Proxy_Google.list)",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
