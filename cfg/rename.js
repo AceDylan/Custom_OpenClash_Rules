@@ -170,7 +170,14 @@ function operator(pro) {
   const BLKEYS = BLKEY ? BLKEY.split("+") : "";
 
   pro.forEach((e) => {
-    let bktf = false, ens = e.name
+    let bktf = false
+
+    // ✅ 关键：统一解码节点名
+    try {
+      e.name =        decodeURIComponent(e.name.replace(/\+/g, "     "));
+    } catch (err) {}
+
+    let ens = e.name
     // 预处理 防止预判或遗漏
     Object.keys(rurekey).forEach((ikey) => {
       if (rurekey[ikey].test(e.name)) {
