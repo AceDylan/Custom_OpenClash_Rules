@@ -174,7 +174,8 @@ function operator(pro) {
 
     // ✅ 关键：统一解码节点名
     try {
-      e.name =        decodeURIComponent(e.name.replace(/\+/g, ""));
+      e.name =
+decodeURIComponent(e.name).replace(/\+/g, " ");
     } catch (err) {}
 
     let ens = e.name
