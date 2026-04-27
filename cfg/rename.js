@@ -135,17 +135,207 @@ const rurekey = {
   Esnc: /esnc/gi,
 };
 
-let GetK = false, AMK = []
-function ObjKA(i) {
-  GetK = true
-  AMK = Object.entries(i)
+const regionAliasMap = {
+  香港: ["hk", "hkg", "hong kong", "hongkong", "港"],
+  澳门: ["mo", "macao", "macau"],
+  台湾: ["tw", "twn", "taiwan", "taipei", "tpe", "台灣", "台北", "高雄"],
+  日本: ["jp", "jpn", "japan", "tokyo", "osaka", "tyo", "nrt", "hnd", "kix", "東京", "东京", "大阪"],
+  韩国: ["kr", "kor", "korea", "south korea", "seoul", "icn", "首爾", "首尔", "春川"],
+  新加坡: ["sg", "sgp", "sin", "singapore", "狮城"],
+  美国: [
+    "us",
+    "usa",
+    "united states",
+    "america",
+    "lax",
+    "sfo",
+    "sjc",
+    "sea",
+    "nyc",
+    "jfk",
+    "iad",
+    "ord",
+    "dfw",
+    "atl",
+    "mia",
+    "los angeles",
+    "san jose",
+    "silicon valley",
+    "new york",
+    "chicago",
+    "seattle",
+  ],
+  英国: ["uk", "gb", "gbr", "united kingdom", "great britain", "london", "lon", "lhr"],
+  法国: ["fr", "france", "paris", "cdg"],
+  德国: ["de", "deu", "germany", "frankfurt", "fra"],
+  澳大利亚: ["au", "aus", "australia", "sydney", "melbourne", "syd", "mel", "澳洲"],
+  阿联酋: ["ae", "uae", "dubai", "dxb", "united arab emirates"],
+  印度: ["in", "ind", "india", "mumbai", "bom"],
+  印尼: ["id", "idn", "indonesia", "jakarta", "jkt"],
+  马来: ["my", "mys", "malaysia", "kuala lumpur", "kul"],
+  菲律宾: ["ph", "phl", "philippines", "manila", "mnl"],
+  泰国: ["th", "tha", "thailand", "bangkok", "bkk"],
+  越南: ["vn", "vnm", "vietnam", "hcm", "ho chi minh", "saigon", "hanoi", "han"],
+  俄罗斯: ["ru", "rus", "russia", "moscow", "mow"],
+  土耳其: ["tr", "tur", "turkey", "istanbul", "ist"],
+  加拿大: ["ca", "can", "canada", "toronto", "vancouver", "yyz", "yvr"],
+  荷兰: ["nl", "nld", "netherlands", "amsterdam", "ams"],
+  瑞士: ["ch", "che", "switzerland", "zurich", "zrh"],
+  西班牙: ["es", "esp", "spain", "madrid", "mad"],
+  意大利: ["it", "ita", "italy", "milan", "rome", "mxp", "fco"],
+  波兰: ["pl", "pol", "poland", "warsaw", "waw"],
+  巴西: ["br", "bra", "brazil", "sao paulo", "gru"],
+  阿根廷: ["ar", "arg", "argentina", "buenos aires", "eze"],
+};
+const ambiguousShortAliases = [
+  "am",
+  "at",
+  "be",
+  "by",
+  "do",
+  "in",
+  "is",
+  "it",
+  "me",
+  "my",
+  "no",
+];
+
+function safeDecodeName(name) {
+  let text = String(name == null ? "" : name);
+  try {
+    text = decodeURIComponent(text);
+  } catch (err) {}
+  return text.replace(/\+/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
+function normalizeName(name) {
+  const text = safeDecodeName(name);
+  const normalizedText =
+    typeof text.normalize === "function" ? text.normalize("NFKC") : text;
+  return normalizedText
+    .replace(/[|｜/\\_\-–—~·・•,，.。:：;；()[\]{}【】<>《》"'“”‘’]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isFlagKey(key) {
+  return /[\uD83C][\uDDE6-\uDDFF]/.test(key);
+}
+
+function hasCjk(text) {
+  return /[\u3400-\u9FFF]/.test(text);
+}
+
+function addMatchEntry(entries, key, value) {
+  const normalizedKey = normalizeName(key);
+  if (!normalizedKey || value == null || value === "") return;
+  entries.push({
+    key,
+    normalizedKey,
+    value,
+    isFlag: isFlagKey(key),
+    isCjk: hasCjk(normalizedKey),
+  });
+}
+
+function buildMatchEntries(allMap, outList, includeAliases) {
+  const entries = [];
+  Object.keys(allMap).forEach((key) => addMatchEntry(entries, key, allMap[key]));
+  if (!includeAliases) return entries;
+  Object.keys(regionAliasMap).forEach((regionName) => {
+    const index = ZH.indexOf(regionName);
+    if (index === -1) return;
+    regionAliasMap[regionName].forEach((alias) =>
+      addMatchEntry(entries, alias, outList[index])
+    );
+  });
+  return entries.sort(
+    (a, b) => b.normalizedKey.length - a.normalizedKey.length
+  );
+}
+
+function normalizeWidth(name) {
+  const text = safeDecodeName(name);
+  return typeof text.normalize === "function" ? text.normalize("NFKC") : text;
+}
+
+function isAmbiguousShortEntry(entry) {
+  return (
+    /^[a-z]{2}$/.test(entry.normalizedKey) &&
+    ambiguousShortAliases.indexOf(entry.normalizedKey) !== -1
+  );
+}
+
+function hasUpperShortCode(entry, originalName) {
+  const key = escapeRegExp(entry.normalizedKey.toUpperCase());
+  return new RegExp(`(^|[^A-Za-z0-9])${key}(?=$|[^A-Za-z0-9]|\\d)`).test(
+    normalizeWidth(originalName)
+  );
+}
+
+function hasNumberedShortCode(entry, normalizedName) {
+  const key = escapeRegExp(entry.normalizedKey);
+  return new RegExp(`(^|[^a-z0-9])${key}(\\d|\\s+\\d{1,3}(?=$|[^a-z0-9]))`).test(
+    normalizedName
+  );
+}
+
+function isMatchEntry(entry, originalName, normalizedName) {
+  if (entry.isFlag) return originalName.includes(entry.key);
+  if (entry.isCjk) return normalizedName.includes(entry.normalizedKey);
+  if (isAmbiguousShortEntry(entry)) {
+    return (
+      hasUpperShortCode(entry, originalName) ||
+      hasNumberedShortCode(entry, normalizedName)
+    );
+  }
+
+  const keyPattern = escapeRegExp(entry.normalizedKey).replace(/\s+/g, "\\s+");
+  const boundaryPattern = `(^|[^a-z0-9])${keyPattern}(?=$|[^a-z0-9]|\\d)`;
+  return new RegExp(boundaryPattern, "i").test(normalizedName);
+}
+
+function rewriteKnownNames(name) {
+  let result = name;
+  Object.keys(rurekey).forEach((ikey) => {
+    const regex = rurekey[ikey];
+    regex.lastIndex = 0;
+    if (regex.test(result)) {
+      regex.lastIndex = 0;
+      result = result.replace(regex, ikey);
+    }
+  });
+  return result;
+}
+
+function getRetainKeys(name, blkeys) {
+  if (!Array.isArray(blkeys) || blkeys.length === 0) return [];
+  const retained = [];
+  blkeys.forEach((item) => {
+    const [key, replacement] = item.split(">");
+    if (!key || !name.includes(key)) return;
+    retained.push(replacement || key);
+  });
+  return retained.filter(
+    (item, index) => item && retained.indexOf(item) === index
+  );
+}
+
+function hasFreeRate(name) {
+  const normalizedName = normalizeName(name);
+  return normalizedName.includes("免费") || /(^|\s)free(?=$|\s)/i.test(normalizedName);
 }
 
 function operator(pro) {
   const Allmap = {};
   const outList = getList(outputName);
-  let inputList,
-    retainKey = "";
+  let inputList;
   if (inname !== "") {
     inputList = [getList(inname)];
   } else {
@@ -158,6 +348,7 @@ function operator(pro) {
     });
   });
   Object.assign(Allmap, customNameMap);
+  const matchEntries = buildMatchEntries(Allmap, outList, inname === "");
 
   if (clear || nx || blnx || key) {
     pro = pro.filter((res) => {
@@ -171,69 +362,19 @@ function operator(pro) {
     });
   }
 
-  const BLKEYS = BLKEY ? BLKEY.split("+") : "";
+  const BLKEYS = BLKEY ? BLKEY.split("+").filter(Boolean) : [];
 
   pro.forEach((e) => {
-    let bktf = false
+    const originalName = safeDecodeName(e.name);
+    e.name = rewriteKnownNames(originalName);
+    const retainKey = getRetainKeys(`${originalName} ${e.name}`, BLKEYS);
 
-    // ✅ 关键：统一解码节点名
-    try {
-      e.name =
-decodeURIComponent(e.name).replace(/\+/g, " ");
-    } catch (err) {}
-
-    let ens = e.name
-    // 预处理 防止预判或遗漏
-    Object.keys(rurekey).forEach((ikey) => {
-      if (rurekey[ikey].test(e.name)) {
-        e.name = e.name.replace(rurekey[ikey], ikey);
-      if (BLKEY) {
-        bktf = true
-        let BLKEY_REPLACE = "",
-        re = false;
-      BLKEYS.forEach((i) => {
-        if (i.includes(">") && ens.includes(i.split(">")[0])) {
-          if (rurekey[ikey].test(i.split(">")[0])) {
-              e.name += " " + i.split(">")[0]
-            }
-          if (i.split(">")[1]) {
-            BLKEY_REPLACE = i.split(">")[1];
-            re = true;
-          }
-        } else {
-          if (ens.includes(i)) {
-             e.name += " " + i
-            }
-        }
-        retainKey = re
-        ? BLKEY_REPLACE
-        : BLKEYS.filter((items) => e.name.includes(items));
-      });}
-      }
-    });
     if (blockquic == "on") {
       e["block-quic"] = "on";
     } else if (blockquic == "off") {
       e["block-quic"] = "off";
     } else {
       delete e["block-quic"];
-    }
-
-    // 自定义
-    if (!bktf && BLKEY) {
-      let BLKEY_REPLACE = "",
-        re = false;
-      BLKEYS.forEach((i) => {
-        if (i.includes(">") && e.name.includes(i.split(">")[0])) {
-          if (i.split(">")[1]) {
-            BLKEY_REPLACE = i.split(">")[1];
-            re = true;
-          }
-        }
-      });
-      retainKey = re
-        ? BLKEY_REPLACE
-        : BLKEYS.filter((items) => e.name.includes(items));
     }
 
     let ikey = "",
@@ -270,15 +411,16 @@ decodeURIComponent(e.name).replace(/\+/g, " ");
           }
         }
       }
+      if (!ikey && hasFreeRate(e.name)) {
+        ikey = "0×";
+      }
     }
 
-    !GetK && ObjKA(Allmap)
     // 匹配 Allkey 地区
-    const lowerName = e.name.toLowerCase();
-    const findKey = AMK.find(([key]) =>
-      e.name.includes(key) ||
-      (customNameMap[key] && lowerName.includes(key.toLowerCase()))
-    )
+    const normalizedName = normalizeName(e.name);
+    const findKey = matchEntries.find((entry) =>
+      isMatchEntry(entry, e.name, normalizedName)
+    );
     
     let firstName = "",
       nNames = "";
@@ -288,8 +430,8 @@ decodeURIComponent(e.name).replace(/\+/g, " ");
     } else {
       nNames = FNAME;
     }
-    if (findKey?.[1]) {
-      const findKeyValue = findKey[1];
+    if (findKey?.value) {
+      const findKeyValue = findKey.value;
       let keyover = [],
         usflag = "";
       if (addflag) {
