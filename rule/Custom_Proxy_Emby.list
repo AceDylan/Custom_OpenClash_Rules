@@ -13,8 +13,6 @@ DOMAIN-SUFFIX,olevod.com
 DOMAIN-SUFFIX,olemovienews.com
 DOMAIN-SUFFIX,olelive.com
 
-# 云海
-DOMAIN-SUFFIX,oceancloud.asia
 
 # 添加域名 7854128.xyz
 DOMAIN-SUFFIX,7854128.xyz
@@ -30,9 +28,6 @@ DOMAIN-SUFFIX,gyplay.xxlb.net
 
 # 添加域名 alphatvx.alphatvapp.top
 DOMAIN-SUFFIX,alphatvx.alphatvapp.top
-
-# 添加域名 vban.xyz
-DOMAIN-SUFFIX,vban.xyz
 
 # 添加IP 107.181.238.190
 IP-CIDR,107.181.238.190/32,no-resolve
