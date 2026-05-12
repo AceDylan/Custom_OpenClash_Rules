@@ -56,3 +56,9 @@ DOMAIN-SUFFIX,emby.trade
 
 # 添加域名 emby.loan
 DOMAIN-SUFFIX,emby.loan
+
+# 云海
+DOMAIN-SUFFIX,oceancloud.asia
+
+# 蘑菇
+DOMAIN-SUFFIX,vban.xyz
