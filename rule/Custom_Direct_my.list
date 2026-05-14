@@ -128,3 +128,6 @@ IP-CIDR,163.116.140.197/32,no-resolve
 DOMAIN-SUFFIX,uuuoo.cc
 
 
+
+# 添加域名 file.sage-modi.com
+DOMAIN-SUFFIX,file.sage-modi.com
