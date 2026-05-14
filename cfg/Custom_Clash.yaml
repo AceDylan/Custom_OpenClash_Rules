@@ -23,12 +23,6 @@ tcp-concurrent: true
 # 统一延迟计算，使延迟测试更准确
 unified-delay: true
 
-proxies:
-  - name: LAN-HTTP
-    type: http
-    server: 172.16.125.2
-    port: 3128
-
 # ==================== 代理提供者 Proxy Provider ====================
 # 用于从订阅链接获取节点，多机场用户复制整个 provider1 块并改名为 provider2, provider3...
 # 同时在后续所有 proxy-groups 的 use 列表中添加新provider
@@ -237,7 +231,6 @@ proxy-groups:
       - "🇯🇵 日本智能"
       - "🇸🇬 新加坡智能"
       - "💬 全部地区"
-      - "LAN-HTTP"
 
   - name: "🎥 流媒体"
     type: select
@@ -247,7 +240,6 @@ proxy-groups:
       - "🇯🇵 日本智能"
       - "🇸🇬 新加坡智能"
       - "💬 全部地区"
-      - "LAN-HTTP"
       - "🎯 全球直连"
 
   - name: "🎬 影音娱乐"
@@ -258,7 +250,6 @@ proxy-groups:
       - "🇯🇵 日本智能"
       - "🇸🇬 新加坡智能"
       - "💬 全部地区"
-      - "LAN-HTTP"
 
   - name: "🇬 谷歌与AI"
     type: select
@@ -268,7 +259,6 @@ proxy-groups:
       - "🇯🇵 日本智能"
       - "🇸🇬 新加坡智能"
       - "💬 全部地区"
-      - "LAN-HTTP"
       - "🎯 全球直连"
 
   - name: "🐟 漏网之鱼"
@@ -279,7 +269,6 @@ proxy-groups:
       - "🇯🇵 日本智能"
       - "🇸🇬 新加坡智能"
       - "💬 全部地区"
-      - "LAN-HTTP"
       - "🎯 全球直连"
 
   - name: "🛠️ 系统与测速"
@@ -291,14 +280,12 @@ proxy-groups:
       - "🇯🇵 日本智能"
       - "🇸🇬 新加坡智能"
       - "💬 全部地区"
-      - "LAN-HTTP"
 
   - name: "🔀 非标端口"
     type: select
     proxies:
       - "🎯 全球直连"
       - "🐟 漏网之鱼"
-      - "LAN-HTTP"
 
   - name: "🇭🇰 香港手选"
     type: select
@@ -414,8 +401,6 @@ proxy-groups:
 
   - name: "💬 全部地区"
     type: select
-    proxies:
-      - "LAN-HTTP"
     filter: '^(?!.*(DIRECT|直接连接|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author|Traffic|GB|Expire)).*$'
     use:
       - provider1
