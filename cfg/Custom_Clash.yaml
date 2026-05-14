@@ -80,7 +80,7 @@ proxy-providers:
     url: "https://"  # **填入你的订阅链接**
     interval: 3600  # 订阅更新间隔（秒），3600=1小时
     path: ./proxy_provider/provider4.yaml # 本地缓存路径
-    proxy: DIRECT  # 下载订阅时使用的代理策略
+    proxy: "🇭🇰 香港节点"  # 下载订阅时使用的代理策略
     header:  # 自定义 HTTP 请求头
     health-check:  # 节点健康检查
       enable: true
