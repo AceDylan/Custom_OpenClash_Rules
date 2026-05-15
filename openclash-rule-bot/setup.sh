@@ -98,6 +98,10 @@ RULE_FILE_NAMES = {
 # 用户状态存储
 user_states = {}
 
+# 循环清理任务存储：按用户ID记录正在运行的定时任务
+loop_clear_tasks = {}
+LOOP_CLEAR_INTERVAL_SECONDS = 10
+
 # 每页显示的规则条数
 RULES_PER_PAGE = 10
 
@@ -178,6 +182,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
         ],
         [
+            InlineKeyboardButton("▶️ 启动循环清理", callback_data="action:start_loop_clear_connections"),
+            InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
+        ],
+        [
             InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")
         ]
     ]
@@ -227,7 +235,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• 🇬 谷歌与AI代理规则 (Custom_Proxy_Google.list)\n\n"
         "🧹 *清空连接：*\n"
         "- 点击清空连接按钮\n"
-        "- 机器人会调用OpenClash API清空所有当前连接",
+        "- 机器人会调用OpenClash API清空所有当前连接\n\n"
+        "🔁 *循环清理：*\n"
+        "- 点击启动循环清理按钮后，机器人会立即尝试清空一次连接，并每10秒自动清空一次\n"
+        "- 点击关闭循环清理按钮后，停止定时调用OpenClash API",
         parse_mode='Markdown'
     )
 
@@ -772,7 +783,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "• 🏠 直连规则 (Custom_Direct_my.list)\n"
                 "• 🎬 Emby代理规则 (Custom_Proxy_Emby.list)\n"
                 "• 💬 社交媒体代理规则 (Custom_Proxy_Media.list)\n"
-                "• 🇬 谷歌与AI代理规则 (Custom_Proxy_Google.list)",
+                "• 🇬 谷歌与AI代理规则 (Custom_Proxy_Google.list)\n\n"
+                "🧹 *清空连接：*\n"
+                "- 点击清空连接按钮\n"
+                "- 机器人会调用OpenClash API清空所有当前连接\n\n"
+                "🔁 *循环清理：*\n"
+                "- 点击启动循环清理按钮后，机器人会立即尝试清空一次连接，并每10秒自动清空一次\n"
+                "- 点击关闭循环清理按钮后，停止定时调用OpenClash API",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
@@ -788,6 +805,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
                 [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
                 [InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")],
+                [
+                    InlineKeyboardButton("▶️ 启动循环清理", callback_data="action:start_loop_clear_connections"),
+                    InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
+                ],
                 [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")],
                 [InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")]
             ]
@@ -809,6 +830,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         elif action == "clear_connections":
             await clear_connections(query)
+            return
+        elif action == "start_loop_clear_connections":
+            await start_loop_clear_connections(query, user_id)
+            return
+        elif action == "stop_loop_clear_connections":
+            await stop_loop_clear_connections(query, user_id)
             return
         elif action == "youtube_unlock":
             await show_youtube_unlock_options(query)
@@ -1596,41 +1623,48 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     await update.message.reply_text("🔍 请输入要搜索的域名或IP地址关键词:")
 
+def build_connection_control_keyboard():
+    """构建连接清理相关操作按钮"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("▶️ 启动循环清理", callback_data="action:start_loop_clear_connections"),
+            InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
+        ],
+        [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+    ])
+
+async def request_clear_connections():
+    """调用OpenClash API清空当前所有连接"""
+    url = f"{OPENCLASH_API_URL}/connections"
+    headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+    response = await asyncio.to_thread(
+        requests.delete,
+        url,
+        headers=headers,
+        timeout=10
+    )
+    return response.status_code
+
 async def clear_connections(query):
     """清空当前所有连接"""
     try:
         await query.edit_message_text("⏳ 正在清空连接...")
-        
-        # 调用OpenClash API
-        url = f"{OPENCLASH_API_URL}/connections"
-        headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+        reply_markup = build_connection_control_keyboard()
         
         try:
-            response = requests.delete(url, headers=headers)
+            status_code = await request_clear_connections()
             
-            if response.status_code == 204:
-                # 创建返回按钮
-                keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
+            if status_code == 204:
                 await query.edit_message_text(
                     "✅ 已成功清空所有连接！",
                     reply_markup=reply_markup
                 )
             else:
-                # 创建返回按钮
-                keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
                 await query.edit_message_text(
-                    f"❌ 清空连接失败，状态码: {response.status_code}",
+                    f"❌ 清空连接失败，状态码: {status_code}",
                     reply_markup=reply_markup
                 )
         except Exception as e:
-            # 创建返回按钮
-            keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
             logger.error(f"清空连接时发生错误: {str(e)}")
             await query.edit_message_text(
                 f"❌ 清空连接失败: {str(e)}",
@@ -1641,14 +1675,67 @@ async def clear_connections(query):
         error_details = traceback.format_exc()
         logger.error(f"清空连接时发生错误: {str(e)}\n{error_details}")
         
-        # 创建返回按钮
-        keyboard = [[InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
         await query.edit_message_text(
             f"❌ 操作失败: {str(e)}",
-            reply_markup=reply_markup
+            reply_markup=build_connection_control_keyboard()
         )
+
+async def loop_clear_connections(user_id):
+    """按固定间隔循环清空连接"""
+    try:
+        while True:
+            try:
+                status_code = await request_clear_connections()
+                if status_code == 204:
+                    logger.info(f"用户 {user_id} 的循环清理已成功清空连接")
+                else:
+                    logger.warning(f"用户 {user_id} 的循环清理失败，状态码: {status_code}")
+            except Exception as e:
+                logger.error(f"用户 {user_id} 的循环清理发生错误: {str(e)}")
+
+            await asyncio.sleep(LOOP_CLEAR_INTERVAL_SECONDS)
+    except asyncio.CancelledError:
+        logger.info(f"用户 {user_id} 的循环清理任务已取消")
+        raise
+    finally:
+        current_task = asyncio.current_task()
+        if loop_clear_tasks.get(user_id) is current_task:
+            loop_clear_tasks.pop(user_id, None)
+
+async def start_loop_clear_connections(query, user_id):
+    """启动循环清理连接"""
+    existing_task = loop_clear_tasks.get(user_id)
+    if existing_task and not existing_task.done():
+        await query.edit_message_text(
+            f"ℹ️ 循环清理已在运行中，每 {LOOP_CLEAR_INTERVAL_SECONDS} 秒自动清空连接。",
+            reply_markup=build_connection_control_keyboard()
+        )
+        return
+
+    task = asyncio.create_task(loop_clear_connections(user_id))
+    loop_clear_tasks[user_id] = task
+
+    await query.edit_message_text(
+        f"✅ 已启动循环清理。\n\n"
+        f"机器人会立即尝试清空一次连接，之后每 {LOOP_CLEAR_INTERVAL_SECONDS} 秒自动清空一次。",
+        reply_markup=build_connection_control_keyboard()
+    )
+
+async def stop_loop_clear_connections(query, user_id):
+    """关闭循环清理连接"""
+    task = loop_clear_tasks.pop(user_id, None)
+    if task and not task.done():
+        task.cancel()
+        await query.edit_message_text(
+            "✅ 已关闭循环清理。",
+            reply_markup=build_connection_control_keyboard()
+        )
+        return
+
+    await query.edit_message_text(
+        "ℹ️ 循环清理当前未运行。",
+        reply_markup=build_connection_control_keyboard()
+    )
 
 # 油管解锁测试相关配置
 YOUTUBE_UNLOCK_DEFAULT_PROVIDER = "全部"
