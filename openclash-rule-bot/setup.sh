@@ -48,6 +48,7 @@ import asyncio
 import traceback
 import nest_asyncio
 import requests
+from urllib.parse import quote
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import git
@@ -100,7 +101,12 @@ user_states = {}
 
 # 循环清理任务存储：按用户ID记录正在运行的定时任务
 loop_clear_tasks = {}
+loop_clear_scopes = {}
+loop_clear_intervals = {}
 LOOP_CLEAR_INTERVAL_SECONDS = 10
+ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS = (10, 20, 30)
+TARGET_CONNECTION_GROUPS = ("✈️ 机场前置",)
+TARGET_CONNECTION_SCOPE_LABEL = "✈️ 机场前置"
 
 # 每页显示的规则条数
 RULES_PER_PAGE = 10
@@ -178,12 +184,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             InlineKeyboardButton("🔄 更新全部", callback_data="action:refresh_all")
         ],
         [
-            InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections"),
-            InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
+            InlineKeyboardButton("🧹 清理机场前置", callback_data="action:clear_target_connections"),
+            InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")
         ],
         [
-            InlineKeyboardButton("▶️ 启动循环清理", callback_data="action:start_loop_clear_connections"),
-            InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
+            InlineKeyboardButton("▶️ 循环清理前置", callback_data="action:start_loop_clear_target_connections"),
+            InlineKeyboardButton("▶️ 循环清理全部", callback_data="action:start_loop_clear_connections")
+        ],
+        [
+            InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections"),
+            InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
         ],
         [
             InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")
@@ -234,10 +244,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• 💬 社交媒体代理规则 (Custom_Proxy_Media.list)\n"
         "• 🇬 谷歌与AI代理规则 (Custom_Proxy_Google.list)\n\n"
         "🧹 *清空连接：*\n"
-        "- 点击清空连接按钮\n"
-        "- 机器人会调用OpenClash API清空所有当前连接\n\n"
+        "- 点击清理机场前置按钮，只清理 chains 包含 ✈️ 机场前置 的当前连接\n"
+        "- 点击清空连接按钮，机器人会调用OpenClash API清空所有当前连接\n\n"
         "🔁 *循环清理：*\n"
-        "- 点击启动循环清理按钮后，机器人会立即尝试清空一次连接，并每10秒自动清空一次\n"
+        "- 点击循环清理前置或循环清理全部按钮后，先选择 10/20/30 秒间隔\n"
+        "- 循环清理前置只清理 ✈️ 机场前置 的连接\n"
+        "- 循环清理全部会按所选间隔自动清空所有连接\n"
         "- 点击关闭循环清理按钮后，停止定时调用OpenClash API",
         parse_mode='Markdown'
     )
@@ -785,10 +797,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "• 💬 社交媒体代理规则 (Custom_Proxy_Media.list)\n"
                 "• 🇬 谷歌与AI代理规则 (Custom_Proxy_Google.list)\n\n"
                 "🧹 *清空连接：*\n"
-                "- 点击清空连接按钮\n"
-                "- 机器人会调用OpenClash API清空所有当前连接\n\n"
+                "- 点击清理机场前置按钮，只清理 chains 包含 ✈️ 机场前置 的当前连接\n"
+                "- 点击清空连接按钮，机器人会调用OpenClash API清空所有当前连接\n\n"
                 "🔁 *循环清理：*\n"
-                "- 点击启动循环清理按钮后，机器人会立即尝试清空一次连接，并每10秒自动清空一次\n"
+                "- 点击循环清理前置或循环清理全部按钮后，先选择 10/20/30 秒间隔\n"
+                "- 循环清理前置只清理 ✈️ 机场前置 的连接\n"
+                "- 循环清理全部会按所选间隔自动清空所有连接\n"
                 "- 点击关闭循环清理按钮后，停止定时调用OpenClash API",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
@@ -804,12 +818,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("❌ 删除规则", callback_data="action:delete")],
                 [InlineKeyboardButton("↔️ 移动规则", callback_data="action:move")],
                 [InlineKeyboardButton("🔄 更新全部规则", callback_data="action:refresh_all")],
-                [InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")],
                 [
-                    InlineKeyboardButton("▶️ 启动循环清理", callback_data="action:start_loop_clear_connections"),
-                    InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
+                    InlineKeyboardButton("🧹 清理机场前置", callback_data="action:clear_target_connections"),
+                    InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")
                 ],
-                [InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")],
+                [
+                    InlineKeyboardButton("▶️ 循环清理前置", callback_data="action:start_loop_clear_target_connections"),
+                    InlineKeyboardButton("▶️ 循环清理全部", callback_data="action:start_loop_clear_connections")
+                ],
+                [
+                    InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections"),
+                    InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
+                ],
                 [InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -831,8 +851,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif action == "clear_connections":
             await clear_connections(query)
             return
+        elif action == "clear_target_connections":
+            await clear_target_connections(query)
+            return
         elif action == "start_loop_clear_connections":
-            await start_loop_clear_connections(query, user_id)
+            await show_loop_clear_interval_options(query, scope="all")
+            return
+        elif action == "start_loop_clear_target_connections":
+            await show_loop_clear_interval_options(query, scope="target")
             return
         elif action == "stop_loop_clear_connections":
             await stop_loop_clear_connections(query, user_id)
@@ -840,6 +866,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif action == "youtube_unlock":
             await show_youtube_unlock_options(query)
             return
+        else:
+            loop_clear_options = parse_loop_clear_interval_action(action)
+            if loop_clear_options:
+                scope, interval_seconds = loop_clear_options
+                await start_loop_clear_connections(
+                    query,
+                    user_id,
+                    scope=scope,
+                    interval_seconds=interval_seconds
+                )
+                return
     # 添加规则
     elif callback_data.startswith("add:file:"):
         file_key = callback_data.split(":")[2]
@@ -1627,11 +1664,69 @@ def build_connection_control_keyboard():
     """构建连接清理相关操作按钮"""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("▶️ 启动循环清理", callback_data="action:start_loop_clear_connections"),
+            InlineKeyboardButton("🧹 清理机场前置", callback_data="action:clear_target_connections"),
+            InlineKeyboardButton("🧹 清空连接", callback_data="action:clear_connections")
+        ],
+        [
+            InlineKeyboardButton("▶️ 循环清理前置", callback_data="action:start_loop_clear_target_connections"),
+            InlineKeyboardButton("▶️ 循环清理全部", callback_data="action:start_loop_clear_connections")
+        ],
+        [
             InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
         ],
         [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
     ])
+
+def build_loop_clear_interval_keyboard(scope):
+    """构建循环清理间隔选择按钮"""
+    scope_key = "target" if scope == "target" else "all"
+    interval_buttons = [
+        InlineKeyboardButton(
+            f"{interval_seconds} 秒",
+            callback_data=f"action:start_loop_clear_{scope_key}_{interval_seconds}"
+        )
+        for interval_seconds in ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS
+    ]
+    return InlineKeyboardMarkup([
+        interval_buttons,
+        [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+    ])
+
+def parse_loop_clear_interval_action(action):
+    """解析循环清理间隔回调"""
+    prefix = "start_loop_clear_"
+    if not action.startswith(prefix):
+        return None
+
+    payload = action[len(prefix):]
+    scope, separator, interval_text = payload.rpartition("_")
+    if not separator or scope not in ("all", "target"):
+        return None
+
+    try:
+        interval_seconds = int(interval_text)
+    except ValueError:
+        return None
+
+    if interval_seconds not in ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS:
+        return None
+
+    return scope, interval_seconds
+
+async def show_loop_clear_interval_options(query, scope):
+    """提示用户选择循环清理间隔"""
+    scope_label = TARGET_CONNECTION_SCOPE_LABEL if scope == "target" else "全部"
+    await query.edit_message_text(
+        f"请选择循环清理间隔。\n\n清理范围：{scope_label}",
+        reply_markup=build_loop_clear_interval_keyboard(scope)
+    )
+
+def connection_matches_target_groups(connection, target_groups):
+    """判断连接的 chains 是否命中指定策略组"""
+    chains = connection.get("chains") or []
+    if isinstance(chains, str):
+        chains = [chains]
+    return any(group in chains for group in target_groups)
 
 async def request_clear_connections():
     """调用OpenClash API清空当前所有连接"""
@@ -1644,6 +1739,60 @@ async def request_clear_connections():
         timeout=10
     )
     return response.status_code
+
+async def request_clear_target_connections(target_groups=TARGET_CONNECTION_GROUPS):
+    """只清理 chains 命中指定策略组的连接"""
+    url = f"{OPENCLASH_API_URL}/connections"
+    headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+    response = await asyncio.to_thread(
+        requests.get,
+        url,
+        headers=headers,
+        timeout=10
+    )
+
+    if response.status_code != 200:
+        return {
+            "ok": False,
+            "status_code": response.status_code,
+            "matched": 0,
+            "cleared": 0,
+            "failed": 0,
+        }
+
+    connections = response.json().get("connections", [])
+    matched_connections = [
+        connection
+        for connection in connections
+        if connection_matches_target_groups(connection, target_groups)
+    ]
+
+    cleared = 0
+    failed = 0
+    for connection in matched_connections:
+        connection_id = connection.get("id")
+        if not connection_id:
+            failed += 1
+            continue
+
+        delete_response = await asyncio.to_thread(
+            requests.delete,
+            f"{url}/{quote(str(connection_id), safe='')}",
+            headers=headers,
+            timeout=10
+        )
+        if delete_response.status_code in (200, 204, 404):
+            cleared += 1
+        else:
+            failed += 1
+
+    return {
+        "ok": failed == 0,
+        "status_code": 200,
+        "matched": len(matched_connections),
+        "cleared": cleared,
+        "failed": failed,
+    }
 
 async def clear_connections(query):
     """清空当前所有连接"""
@@ -1680,20 +1829,75 @@ async def clear_connections(query):
             reply_markup=build_connection_control_keyboard()
         )
 
-async def loop_clear_connections(user_id):
-    """按固定间隔循环清空连接"""
+async def clear_target_connections(query):
+    """清理指定策略组的当前连接"""
+    try:
+        await query.edit_message_text(f"⏳ 正在清理 {TARGET_CONNECTION_SCOPE_LABEL} 连接...")
+        reply_markup = build_connection_control_keyboard()
+
+        try:
+            result = await request_clear_target_connections()
+            if result["status_code"] != 200:
+                await query.edit_message_text(
+                    f"❌ 获取连接列表失败，状态码: {result['status_code']}",
+                    reply_markup=reply_markup
+                )
+            elif result["matched"] == 0:
+                await query.edit_message_text(
+                    f"ℹ️ 当前没有 {TARGET_CONNECTION_SCOPE_LABEL} 连接需要清理。",
+                    reply_markup=reply_markup
+                )
+            elif result["ok"]:
+                await query.edit_message_text(
+                    f"✅ 已清理 {result['cleared']} 条 {TARGET_CONNECTION_SCOPE_LABEL} 连接。",
+                    reply_markup=reply_markup
+                )
+            else:
+                await query.edit_message_text(
+                    f"⚠️ 已清理 {result['cleared']} 条，失败 {result['failed']} 条。",
+                    reply_markup=reply_markup
+                )
+        except Exception as e:
+            logger.error(f"清理指定连接时发生错误: {str(e)}")
+            await query.edit_message_text(
+                f"❌ 清理指定连接失败: {str(e)}",
+                reply_markup=reply_markup
+            )
+
+    except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"清理指定连接时发生错误: {str(e)}\n{error_details}")
+
+        await query.edit_message_text(
+            f"❌ 操作失败: {str(e)}",
+            reply_markup=build_connection_control_keyboard()
+        )
+
+async def loop_clear_connections(user_id, scope="all", interval_seconds=LOOP_CLEAR_INTERVAL_SECONDS):
+    """按固定间隔循环清理连接"""
     try:
         while True:
             try:
-                status_code = await request_clear_connections()
-                if status_code == 204:
-                    logger.info(f"用户 {user_id} 的循环清理已成功清空连接")
+                if scope == "target":
+                    result = await request_clear_target_connections()
+                    if result["ok"]:
+                        logger.info(
+                            f"用户 {user_id} 的循环清理已清理 {result['cleared']} 条 {TARGET_CONNECTION_SCOPE_LABEL} 连接"
+                        )
+                    else:
+                        logger.warning(
+                            f"用户 {user_id} 的循环清理失败，状态码: {result['status_code']}，失败: {result['failed']}"
+                        )
                 else:
-                    logger.warning(f"用户 {user_id} 的循环清理失败，状态码: {status_code}")
+                    status_code = await request_clear_connections()
+                    if status_code == 204:
+                        logger.info(f"用户 {user_id} 的循环清理已成功清空连接")
+                    else:
+                        logger.warning(f"用户 {user_id} 的循环清理失败，状态码: {status_code}")
             except Exception as e:
                 logger.error(f"用户 {user_id} 的循环清理发生错误: {str(e)}")
 
-            await asyncio.sleep(LOOP_CLEAR_INTERVAL_SECONDS)
+            await asyncio.sleep(interval_seconds)
     except asyncio.CancelledError:
         logger.info(f"用户 {user_id} 的循环清理任务已取消")
         raise
@@ -1701,29 +1905,40 @@ async def loop_clear_connections(user_id):
         current_task = asyncio.current_task()
         if loop_clear_tasks.get(user_id) is current_task:
             loop_clear_tasks.pop(user_id, None)
+            loop_clear_scopes.pop(user_id, None)
+            loop_clear_intervals.pop(user_id, None)
 
-async def start_loop_clear_connections(query, user_id):
+async def start_loop_clear_connections(query, user_id, scope="all", interval_seconds=LOOP_CLEAR_INTERVAL_SECONDS):
     """启动循环清理连接"""
     existing_task = loop_clear_tasks.get(user_id)
     if existing_task and not existing_task.done():
+        running_scope = loop_clear_scopes.get(user_id, "all")
+        running_label = TARGET_CONNECTION_SCOPE_LABEL if running_scope == "target" else "全部"
+        running_interval = loop_clear_intervals.get(user_id, LOOP_CLEAR_INTERVAL_SECONDS)
         await query.edit_message_text(
-            f"ℹ️ 循环清理已在运行中，每 {LOOP_CLEAR_INTERVAL_SECONDS} 秒自动清空连接。",
+            f"ℹ️ 循环清理已在运行中，当前范围：{running_label}，每 {running_interval} 秒执行一次。",
             reply_markup=build_connection_control_keyboard()
         )
         return
 
-    task = asyncio.create_task(loop_clear_connections(user_id))
+    task = asyncio.create_task(loop_clear_connections(user_id, scope, interval_seconds))
     loop_clear_tasks[user_id] = task
+    loop_clear_scopes[user_id] = scope
+    loop_clear_intervals[user_id] = interval_seconds
+    scope_label = TARGET_CONNECTION_SCOPE_LABEL if scope == "target" else "全部"
 
     await query.edit_message_text(
         f"✅ 已启动循环清理。\n\n"
-        f"机器人会立即尝试清空一次连接，之后每 {LOOP_CLEAR_INTERVAL_SECONDS} 秒自动清空一次。",
+        f"清理范围：{scope_label}\n"
+        f"机器人会立即尝试清理一次连接，之后每 {interval_seconds} 秒自动执行一次。",
         reply_markup=build_connection_control_keyboard()
     )
 
 async def stop_loop_clear_connections(query, user_id):
     """关闭循环清理连接"""
     task = loop_clear_tasks.pop(user_id, None)
+    loop_clear_scopes.pop(user_id, None)
+    loop_clear_intervals.pop(user_id, None)
     if task and not task.done():
         task.cancel()
         await query.edit_message_text(
