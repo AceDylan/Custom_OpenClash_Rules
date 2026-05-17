@@ -3,3 +3,5 @@
 .claude
 .ace-tool/
 .github
+__pycache__/
+*.py[cod]
