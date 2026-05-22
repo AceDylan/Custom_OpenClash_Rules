@@ -64,3 +64,6 @@ DOMAIN-SUFFIX,88code.org
 
 # 添加域名 anyrouter.top
 DOMAIN-SUFFIX,anyrouter.top
+
+# 添加域名 reclaude.ai
+DOMAIN-SUFFIX,reclaude.ai
