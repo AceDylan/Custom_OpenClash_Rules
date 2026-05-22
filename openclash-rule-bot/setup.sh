@@ -190,6 +190,7 @@ import os
 import re
 import logging
 import asyncio
+import time
 import traceback
 import nest_asyncio
 import requests
@@ -253,6 +254,9 @@ LOOP_CLEAR_INTERVAL_SECONDS = 10
 ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS = (10, 20, 30)
 TARGET_CONNECTION_GROUPS = ("✈️ 机场前置",)
 TARGET_CONNECTION_SCOPE_LABEL = "✈️ 机场前置"
+# 循环清理前置：仅当目标策略组下载速率低于此门槛时才执行清理
+TARGET_DOWNLOAD_RATE_THRESHOLD_BPS = 3 * 1024 * 1024  # 3 MB/s
+TARGET_DOWNLOAD_RATE_SAMPLE_SECONDS = 2               # 测速采样窗口（秒）
 
 # 每页显示的规则条数
 RULES_PER_PAGE = 10
@@ -1874,6 +1878,80 @@ def connection_matches_target_groups(connection, target_groups):
         chains = [chains]
     return any(group in chains for group in target_groups)
 
+async def fetch_target_connection_downloads(target_groups=TARGET_CONNECTION_GROUPS):
+    """采样一次 /connections，返回命中目标策略组连接的 {id: 累计下载字节}"""
+    url = f"{OPENCLASH_API_URL}/connections"
+    headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+    response = await asyncio.to_thread(
+        requests.get,
+        url,
+        headers=headers,
+        timeout=10
+    )
+    if response.status_code != 200:
+        return {"ok": False, "status_code": response.status_code, "downloads": {}}
+
+    downloads = {}
+    for connection in response.json().get("connections", []):
+        if not connection_matches_target_groups(connection, target_groups):
+            continue
+        connection_id = connection.get("id")
+        if connection_id:
+            downloads[str(connection_id)] = int(connection.get("download") or 0)
+
+    return {"ok": True, "status_code": 200, "downloads": downloads}
+
+async def measure_target_download_rate(target_groups=TARGET_CONNECTION_GROUPS):
+    """间隔采样两次，按连接 id 求下载增量，计算目标策略组的下载速率（字节/秒）
+
+    返回 dict：
+      ok        测速结果是否可信（可信时 rate_bps 才有意义）
+      rate_bps  下载速率（字节/秒）
+      reason    结果说明 / 不可信原因
+      sampled   两次采样都存在的目标连接数
+      current   第二次采样时的目标连接数
+    测速过程中的任何异常都吞掉并返回 ok=False（fail-open：交由调用方照常清理），
+    但不捕获 asyncio.CancelledError（其继承自 BaseException），确保任务仍可被正常取消。
+    """
+    try:
+        first = await fetch_target_connection_downloads(target_groups)
+        if not first["ok"]:
+            return {"ok": False, "rate_bps": 0.0,
+                    "reason": f"first_sample_http_{first['status_code']}",
+                    "sampled": 0, "current": 0}
+        # 以采样收到的时刻为分母端点，剔除 API 往返耗时对速率的干扰
+        first_at = time.monotonic()
+
+        await asyncio.sleep(TARGET_DOWNLOAD_RATE_SAMPLE_SECONDS)
+
+        second = await fetch_target_connection_downloads(target_groups)
+        if not second["ok"]:
+            return {"ok": False, "rate_bps": 0.0,
+                    "reason": f"second_sample_http_{second['status_code']}",
+                    "sampled": 0, "current": 0}
+        elapsed = time.monotonic() - first_at
+
+        current = len(second["downloads"])
+        # 仅统计两次采样都存在的连接，避免用新建/销毁连接的累计值误算瞬时速率
+        common_ids = [cid for cid in first["downloads"] if cid in second["downloads"]]
+        if not common_ids:
+            # 无目标连接：按空闲处理（ok=True，速率 0）；有连接但全是新建：样本不足
+            reason = "no_connections" if current == 0 else "insufficient_samples"
+            return {"ok": current == 0, "rate_bps": 0.0, "reason": reason,
+                    "sampled": 0, "current": current}
+
+        delta = sum(
+            max(0, second["downloads"][cid] - first["downloads"][cid])
+            for cid in common_ids
+        )
+        return {"ok": True, "rate_bps": delta / max(elapsed, 0.001), "reason": "ok",
+                "sampled": len(common_ids), "current": current}
+    except Exception as exc:
+        # fail-open：测速异常时返回不可信结果，由调用方照常清理
+        return {"ok": False, "rate_bps": 0.0,
+                "reason": f"sample_exception:{type(exc).__name__}",
+                "sampled": 0, "current": 0}
+
 async def request_clear_connections():
     """调用OpenClash API清空当前所有连接"""
     url = f"{OPENCLASH_API_URL}/connections"
@@ -2025,15 +2103,33 @@ async def loop_clear_connections(user_id, scope="all", interval_seconds=LOOP_CLE
         while True:
             try:
                 if scope == "target":
-                    result = await request_clear_target_connections()
-                    if result["ok"]:
+                    # 清理前测速：仅当目标策略组下载速率确切低于门槛时才清理；
+                    # 速率确切达标则跳过本轮、等下一轮再测；测速不可用时按 fail-open 照常清理
+                    rate = await measure_target_download_rate()
+                    rate_mb = rate["rate_bps"] / 1024 / 1024
+                    threshold_mb = TARGET_DOWNLOAD_RATE_THRESHOLD_BPS / 1024 / 1024
+                    if rate["ok"] and rate["rate_bps"] >= TARGET_DOWNLOAD_RATE_THRESHOLD_BPS:
                         logger.info(
-                            f"用户 {user_id} 的循环清理已清理 {result['cleared']} 条 {TARGET_CONNECTION_SCOPE_LABEL} 连接"
+                            f"用户 {user_id} 的循环清理：{TARGET_CONNECTION_SCOPE_LABEL} 下载速率 "
+                            f"{rate_mb:.2f} MB/s >= {threshold_mb:.2f} MB/s，跳过本轮清理"
                         )
                     else:
-                        logger.warning(
-                            f"用户 {user_id} 的循环清理失败，状态码: {result['status_code']}，失败: {result['failed']}"
-                        )
+                        if not rate["ok"]:
+                            logger.info(
+                                f"用户 {user_id} 的循环清理：测速不可用（{rate['reason']}），"
+                                f"按 fail-open 策略照常清理"
+                            )
+                        result = await request_clear_target_connections()
+                        if result["ok"]:
+                            speed_note = f"（下载速率 {rate_mb:.2f} MB/s）" if rate["ok"] else ""
+                            logger.info(
+                                f"用户 {user_id} 的循环清理已清理 {result['cleared']} 条 "
+                                f"{TARGET_CONNECTION_SCOPE_LABEL} 连接{speed_note}"
+                            )
+                        else:
+                            logger.warning(
+                                f"用户 {user_id} 的循环清理失败，状态码: {result['status_code']}，失败: {result['failed']}"
+                            )
                 else:
                     status_code = await request_clear_connections()
                     if status_code == 204:
