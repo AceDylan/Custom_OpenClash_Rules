@@ -135,3 +135,6 @@ DOMAIN-SUFFIX,acemcp.heroman.wtf
 
 # 添加域名 xn--ngstr-lra8j.com
 DOMAIN-SUFFIX,xn--ngstr-lra8j.com
+
+# 添加域名 clientservices.googleapis.com
+DOMAIN-SUFFIX,clientservices.googleapis.com
