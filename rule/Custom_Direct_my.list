@@ -138,3 +138,7 @@ DOMAIN-SUFFIX,xn--ngstr-lra8j.com
 
 # 添加域名 clientservices.googleapis.com
 DOMAIN-SUFFIX,clientservices.googleapis.com
+
+DOMAIN-SUFFIX,update.googleapis.com
+DOMAIN-SUFFIX,translate.googleapis.com
+DOMAIN-SUFFIX,fonts.googleapis.com
