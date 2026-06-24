@@ -143,5 +143,3 @@ DOMAIN-SUFFIX,update.googleapis.com
 DOMAIN-SUFFIX,translate.googleapis.com
 DOMAIN-SUFFIX,fonts.googleapis.com
 
-# 添加域名 ccgfw.top
-DOMAIN-SUFFIX,ccgfw.top
