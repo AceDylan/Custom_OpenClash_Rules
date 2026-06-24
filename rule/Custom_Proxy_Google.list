@@ -1,23 +1,6 @@
 # GooglePlay 相关
 DOMAIN-SUFFIX,googleapis.cn
 
-# 添加域名 maosu.website
-DOMAIN-SUFFIX,maosu.website
-
-# 添加域名 saojc.xyz
-DOMAIN-SUFFIX,saojc.xyz
-
-
-# 添加域名 stga.cn
-DOMAIN-SUFFIX,stga.cn
-
-# 添加域名 yep.li
-DOMAIN-SUFFIX,yep.li
-
-# 添加域名 hishis.cn
-DOMAIN-SUFFIX,hishis.cn
-
-
 # Monica
 DOMAIN-SUFFIX,monica.im
 
@@ -39,10 +22,8 @@ DOMAIN-SUFFIX,manus.im
 # 添加域名 ai.megallm.io
 DOMAIN-SUFFIX,ai.megallm.io
 
-
 # 添加域名 88code.ai
 DOMAIN-SUFFIX,88code.ai
-
 
 # 添加域名 privnode.com
 DOMAIN-SUFFIX,privnode.com
