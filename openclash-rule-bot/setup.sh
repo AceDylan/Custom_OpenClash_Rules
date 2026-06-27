@@ -248,7 +248,6 @@ user_states = {}
 
 # 循环清理任务存储：按用户ID记录正在运行的定时任务
 loop_clear_tasks = {}
-loop_clear_scopes = {}
 loop_clear_intervals = {}
 LOOP_CLEAR_INTERVAL_SECONDS = 10
 ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS = (10, 20, 30)
@@ -257,6 +256,30 @@ TARGET_CONNECTION_SCOPE_LABEL = "✈️ 机场前置"
 # 循环清理前置：仅当目标策略组下载速率低于此门槛时才执行清理
 TARGET_DOWNLOAD_RATE_THRESHOLD_BPS = 3 * 1024 * 1024  # 3 MB/s
 TARGET_DOWNLOAD_RATE_SAMPLE_SECONDS = 2               # 测速采样窗口（秒）
+
+# 策略切换：在"链式前置"与"直连智能"之间切换应用策略组的当前选择
+# 作用范围：以下应用策略组（不含 链式/智能/送中组 等基础组本身，避免自引用）
+PROXY_SWITCH_APPLICATION_GROUPS = (
+    "💬 社交媒体",
+    "🎥 流媒体",
+    "🎬 影音娱乐",
+    "🇬 谷歌与AI",
+    "🐟 漏网之鱼",
+    "🛠️ 系统与测速",
+)
+# 影音娱乐为强制组：切到链式→送中组、切回智能→日本智能（无视当前值）
+PROXY_SWITCH_FORCED_GROUP = "🎬 影音娱乐"
+PROXY_SWITCH_FORCED_CHAIN_VALUE = "🔙 送中组"
+PROXY_SWITCH_FORCED_SMART_VALUE = "🇯🇵 日本智能"
+# 通用组按当前选中值映射（未命中的值，如香港/美国/直连，保持不变）
+PROXY_SWITCH_TO_CHAIN_MAP = {
+    "🇸🇬 新加坡智能": "🔗 链式新加坡",
+    "🇯🇵 日本智能": "🔗 链式日本",
+}
+PROXY_SWITCH_TO_SMART_MAP = {
+    "🔗 链式新加坡": "🇸🇬 新加坡智能",
+    "🔗 链式日本": "🇯🇵 日本智能",
+}
 
 # 每页显示的规则条数
 RULES_PER_PAGE = 10
@@ -339,10 +362,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ],
         [
             InlineKeyboardButton("▶️ 循环清理前置", callback_data="action:start_loop_clear_target_connections"),
-            InlineKeyboardButton("▶️ 循环清理全部", callback_data="action:start_loop_clear_connections")
+            InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
         ],
         [
-            InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections"),
+            InlineKeyboardButton("🔀 策略切换", callback_data="action:proxy_switch_menu"),
             InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
         ],
         [
@@ -396,11 +419,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "🧹 *清空连接：*\n"
         "- 点击清理机场前置按钮，只清理 chains 包含 ✈️ 机场前置 的当前连接\n"
         "- 点击清空连接按钮，机器人会调用OpenClash API清空所有当前连接\n\n"
-        "🔁 *循环清理：*\n"
-        "- 点击循环清理前置或循环清理全部按钮后，先选择 10/20/30 秒间隔\n"
-        "- 循环清理前置只清理 ✈️ 机场前置 的连接\n"
-        "- 循环清理全部会按所选间隔自动清空所有连接\n"
-        "- 点击关闭循环清理按钮后，停止定时调用OpenClash API",
+        "🔁 *循环清理前置：*\n"
+        "- 点击循环清理前置按钮后，先选择 10/20/30 秒间隔\n"
+        "- 仅在 ✈️ 机场前置 下载速率低于阈值时，按所选间隔自动清理其连接\n"
+        "- 点击关闭循环清理按钮后，停止定时调用OpenClash API\n\n"
+        "🔀 *策略切换：*\n"
+        "- 🔗 切到链式：应用策略组切到链式前置（🎬 影音娱乐 → 🔙 送中组）\n"
+        "- 🧠 切回智能：切回直连智能（🎬 影音娱乐 → 🇯🇵 日本智能）",
         parse_mode='Markdown'
     )
 
@@ -949,11 +974,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "🧹 *清空连接：*\n"
                 "- 点击清理机场前置按钮，只清理 chains 包含 ✈️ 机场前置 的当前连接\n"
                 "- 点击清空连接按钮，机器人会调用OpenClash API清空所有当前连接\n\n"
-                "🔁 *循环清理：*\n"
-                "- 点击循环清理前置或循环清理全部按钮后，先选择 10/20/30 秒间隔\n"
-                "- 循环清理前置只清理 ✈️ 机场前置 的连接\n"
-                "- 循环清理全部会按所选间隔自动清空所有连接\n"
-                "- 点击关闭循环清理按钮后，停止定时调用OpenClash API",
+                "🔁 *循环清理前置：*\n"
+                "- 点击循环清理前置按钮后，先选择 10/20/30 秒间隔\n"
+                "- 仅在 ✈️ 机场前置 下载速率低于阈值时，按所选间隔自动清理其连接\n"
+                "- 点击关闭循环清理按钮后，停止定时调用OpenClash API\n\n"
+                "🔀 *策略切换：*\n"
+                "- 🔗 切到链式：应用策略组切到链式前置（🎬 影音娱乐 → 🔙 送中组）\n"
+                "- 🧠 切回智能：切回直连智能（🎬 影音娱乐 → 🇯🇵 日本智能）",
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
@@ -974,10 +1001,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 ],
                 [
                     InlineKeyboardButton("▶️ 循环清理前置", callback_data="action:start_loop_clear_target_connections"),
-                    InlineKeyboardButton("▶️ 循环清理全部", callback_data="action:start_loop_clear_connections")
+                    InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
                 ],
                 [
-                    InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections"),
+                    InlineKeyboardButton("🔀 策略切换", callback_data="action:proxy_switch_menu"),
                     InlineKeyboardButton("ℹ️ 帮助信息", callback_data="action:help")
                 ],
                 [InlineKeyboardButton("📺 测试油管解锁", callback_data="action:youtube_unlock")]
@@ -1004,26 +1031,30 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif action == "clear_target_connections":
             await clear_target_connections(query)
             return
-        elif action == "start_loop_clear_connections":
-            await show_loop_clear_interval_options(query, scope="all")
-            return
         elif action == "start_loop_clear_target_connections":
-            await show_loop_clear_interval_options(query, scope="target")
+            await show_loop_clear_interval_options(query)
             return
         elif action == "stop_loop_clear_connections":
             await stop_loop_clear_connections(query, user_id)
+            return
+        elif action == "proxy_switch_menu":
+            await show_proxy_switch_menu(query)
+            return
+        elif action == "proxy_switch_chain":
+            await switch_application_proxies(query, "chain")
+            return
+        elif action == "proxy_switch_smart":
+            await switch_application_proxies(query, "smart")
             return
         elif action == "youtube_unlock":
             await show_youtube_unlock_options(query)
             return
         else:
-            loop_clear_options = parse_loop_clear_interval_action(action)
-            if loop_clear_options:
-                scope, interval_seconds = loop_clear_options
+            interval_seconds = parse_loop_clear_interval_action(action)
+            if interval_seconds is not None:
                 await start_loop_clear_connections(
                     query,
                     user_id,
-                    scope=scope,
                     interval_seconds=interval_seconds
                 )
                 return
@@ -1819,21 +1850,17 @@ def build_connection_control_keyboard():
         ],
         [
             InlineKeyboardButton("▶️ 循环清理前置", callback_data="action:start_loop_clear_target_connections"),
-            InlineKeyboardButton("▶️ 循环清理全部", callback_data="action:start_loop_clear_connections")
-        ],
-        [
             InlineKeyboardButton("⏹️ 关闭循环清理", callback_data="action:stop_loop_clear_connections")
         ],
         [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
     ])
 
-def build_loop_clear_interval_keyboard(scope):
-    """构建循环清理间隔选择按钮"""
-    scope_key = "target" if scope == "target" else "all"
+def build_loop_clear_interval_keyboard():
+    """构建循环清理间隔选择按钮（仅前置）"""
     interval_buttons = [
         InlineKeyboardButton(
             f"{interval_seconds} 秒",
-            callback_data=f"action:start_loop_clear_{scope_key}_{interval_seconds}"
+            callback_data=f"action:start_loop_clear_target_{interval_seconds}"
         )
         for interval_seconds in ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS
     ]
@@ -1843,16 +1870,12 @@ def build_loop_clear_interval_keyboard(scope):
     ])
 
 def parse_loop_clear_interval_action(action):
-    """解析循环清理间隔回调"""
-    prefix = "start_loop_clear_"
+    """解析循环清理间隔回调（仅前置），返回间隔秒数或 None"""
+    prefix = "start_loop_clear_target_"
     if not action.startswith(prefix):
         return None
 
-    payload = action[len(prefix):]
-    scope, separator, interval_text = payload.rpartition("_")
-    if not separator or scope not in ("all", "target"):
-        return None
-
+    interval_text = action[len(prefix):]
     try:
         interval_seconds = int(interval_text)
     except ValueError:
@@ -1861,14 +1884,13 @@ def parse_loop_clear_interval_action(action):
     if interval_seconds not in ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS:
         return None
 
-    return scope, interval_seconds
+    return interval_seconds
 
-async def show_loop_clear_interval_options(query, scope):
+async def show_loop_clear_interval_options(query):
     """提示用户选择循环清理间隔"""
-    scope_label = TARGET_CONNECTION_SCOPE_LABEL if scope == "target" else "全部"
     await query.edit_message_text(
-        f"请选择循环清理间隔。\n\n清理范围：{scope_label}",
-        reply_markup=build_loop_clear_interval_keyboard(scope)
+        f"请选择循环清理间隔。\n\n清理范围：{TARGET_CONNECTION_SCOPE_LABEL}",
+        reply_markup=build_loop_clear_interval_keyboard()
     )
 
 def connection_matches_target_groups(connection, target_groups):
@@ -2097,45 +2119,38 @@ async def clear_target_connections(query):
             reply_markup=build_connection_control_keyboard()
         )
 
-async def loop_clear_connections(user_id, scope="all", interval_seconds=LOOP_CLEAR_INTERVAL_SECONDS):
-    """按固定间隔循环清理连接"""
+async def loop_clear_connections(user_id, interval_seconds=LOOP_CLEAR_INTERVAL_SECONDS):
+    """按固定间隔循环清理 ✈️ 机场前置 的连接"""
     try:
         while True:
             try:
-                if scope == "target":
-                    # 清理前测速：仅当目标策略组下载速率确切低于门槛时才清理；
-                    # 速率确切达标则跳过本轮、等下一轮再测；测速不可用时按 fail-open 照常清理
-                    rate = await measure_target_download_rate()
-                    rate_mb = rate["rate_bps"] / 1024 / 1024
-                    threshold_mb = TARGET_DOWNLOAD_RATE_THRESHOLD_BPS / 1024 / 1024
-                    if rate["ok"] and rate["rate_bps"] >= TARGET_DOWNLOAD_RATE_THRESHOLD_BPS:
+                # 清理前测速：仅当目标策略组下载速率确切低于门槛时才清理；
+                # 速率确切达标则跳过本轮、等下一轮再测；测速不可用时按 fail-open 照常清理
+                rate = await measure_target_download_rate()
+                rate_mb = rate["rate_bps"] / 1024 / 1024
+                threshold_mb = TARGET_DOWNLOAD_RATE_THRESHOLD_BPS / 1024 / 1024
+                if rate["ok"] and rate["rate_bps"] >= TARGET_DOWNLOAD_RATE_THRESHOLD_BPS:
+                    logger.info(
+                        f"用户 {user_id} 的循环清理：{TARGET_CONNECTION_SCOPE_LABEL} 下载速率 "
+                        f"{rate_mb:.2f} MB/s >= {threshold_mb:.2f} MB/s，跳过本轮清理"
+                    )
+                else:
+                    if not rate["ok"]:
                         logger.info(
-                            f"用户 {user_id} 的循环清理：{TARGET_CONNECTION_SCOPE_LABEL} 下载速率 "
-                            f"{rate_mb:.2f} MB/s >= {threshold_mb:.2f} MB/s，跳过本轮清理"
+                            f"用户 {user_id} 的循环清理：测速不可用（{rate['reason']}），"
+                            f"按 fail-open 策略照常清理"
+                        )
+                    result = await request_clear_target_connections()
+                    if result["ok"]:
+                        speed_note = f"（下载速率 {rate_mb:.2f} MB/s）" if rate["ok"] else ""
+                        logger.info(
+                            f"用户 {user_id} 的循环清理已清理 {result['cleared']} 条 "
+                            f"{TARGET_CONNECTION_SCOPE_LABEL} 连接{speed_note}"
                         )
                     else:
-                        if not rate["ok"]:
-                            logger.info(
-                                f"用户 {user_id} 的循环清理：测速不可用（{rate['reason']}），"
-                                f"按 fail-open 策略照常清理"
-                            )
-                        result = await request_clear_target_connections()
-                        if result["ok"]:
-                            speed_note = f"（下载速率 {rate_mb:.2f} MB/s）" if rate["ok"] else ""
-                            logger.info(
-                                f"用户 {user_id} 的循环清理已清理 {result['cleared']} 条 "
-                                f"{TARGET_CONNECTION_SCOPE_LABEL} 连接{speed_note}"
-                            )
-                        else:
-                            logger.warning(
-                                f"用户 {user_id} 的循环清理失败，状态码: {result['status_code']}，失败: {result['failed']}"
-                            )
-                else:
-                    status_code = await request_clear_connections()
-                    if status_code == 204:
-                        logger.info(f"用户 {user_id} 的循环清理已成功清空连接")
-                    else:
-                        logger.warning(f"用户 {user_id} 的循环清理失败，状态码: {status_code}")
+                        logger.warning(
+                            f"用户 {user_id} 的循环清理失败，状态码: {result['status_code']}，失败: {result['failed']}"
+                        )
             except Exception as e:
                 logger.error(f"用户 {user_id} 的循环清理发生错误: {str(e)}")
 
@@ -2147,31 +2162,26 @@ async def loop_clear_connections(user_id, scope="all", interval_seconds=LOOP_CLE
         current_task = asyncio.current_task()
         if loop_clear_tasks.get(user_id) is current_task:
             loop_clear_tasks.pop(user_id, None)
-            loop_clear_scopes.pop(user_id, None)
             loop_clear_intervals.pop(user_id, None)
 
-async def start_loop_clear_connections(query, user_id, scope="all", interval_seconds=LOOP_CLEAR_INTERVAL_SECONDS):
-    """启动循环清理连接"""
+async def start_loop_clear_connections(query, user_id, interval_seconds=LOOP_CLEAR_INTERVAL_SECONDS):
+    """启动循环清理 ✈️ 机场前置 的连接"""
     existing_task = loop_clear_tasks.get(user_id)
     if existing_task and not existing_task.done():
-        running_scope = loop_clear_scopes.get(user_id, "all")
-        running_label = TARGET_CONNECTION_SCOPE_LABEL if running_scope == "target" else "全部"
         running_interval = loop_clear_intervals.get(user_id, LOOP_CLEAR_INTERVAL_SECONDS)
         await query.edit_message_text(
-            f"ℹ️ 循环清理已在运行中，当前范围：{running_label}，每 {running_interval} 秒执行一次。",
+            f"ℹ️ 循环清理已在运行中，当前范围：{TARGET_CONNECTION_SCOPE_LABEL}，每 {running_interval} 秒执行一次。",
             reply_markup=build_connection_control_keyboard()
         )
         return
 
-    task = asyncio.create_task(loop_clear_connections(user_id, scope, interval_seconds))
+    task = asyncio.create_task(loop_clear_connections(user_id, interval_seconds))
     loop_clear_tasks[user_id] = task
-    loop_clear_scopes[user_id] = scope
     loop_clear_intervals[user_id] = interval_seconds
-    scope_label = TARGET_CONNECTION_SCOPE_LABEL if scope == "target" else "全部"
 
     await query.edit_message_text(
         f"✅ 已启动循环清理。\n\n"
-        f"清理范围：{scope_label}\n"
+        f"清理范围：{TARGET_CONNECTION_SCOPE_LABEL}\n"
         f"机器人会立即尝试清理一次连接，之后每 {interval_seconds} 秒自动执行一次。",
         reply_markup=build_connection_control_keyboard()
     )
@@ -2179,7 +2189,6 @@ async def start_loop_clear_connections(query, user_id, scope="all", interval_sec
 async def stop_loop_clear_connections(query, user_id):
     """关闭循环清理连接"""
     task = loop_clear_tasks.pop(user_id, None)
-    loop_clear_scopes.pop(user_id, None)
     loop_clear_intervals.pop(user_id, None)
     if task and not task.done():
         task.cancel()
@@ -2192,6 +2201,149 @@ async def stop_loop_clear_connections(query, user_id):
     await query.edit_message_text(
         "ℹ️ 循环清理当前未运行。",
         reply_markup=build_connection_control_keyboard()
+    )
+
+def build_proxy_switch_keyboard():
+    """构建策略切换子菜单按钮"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔗 切到链式", callback_data="action:proxy_switch_chain"),
+            InlineKeyboardButton("🧠 切回智能", callback_data="action:proxy_switch_smart")
+        ],
+        [InlineKeyboardButton("🏠 返回主菜单", callback_data="action:start")]
+    ])
+
+async def show_proxy_switch_menu(query):
+    """显示策略切换子菜单"""
+    groups = " / ".join(PROXY_SWITCH_APPLICATION_GROUPS)
+    await query.edit_message_text(
+        "🔀 *策略切换*\n\n"
+        "通过 OpenClash API 按各应用策略组的当前选择批量切换：\n\n"
+        "🔗 *切到链式*：直连智能 → 链式前置\n"
+        "- 🇸🇬 新加坡智能 → 🔗 链式新加坡\n"
+        "- 🇯🇵 日本智能 → 🔗 链式日本\n"
+        "- 🎬 影音娱乐 → 🔙 送中组（强制）\n\n"
+        "🧠 *切回智能*：链式前置 → 直连智能\n"
+        "- 🔗 链式新加坡 → 🇸🇬 新加坡智能\n"
+        "- 🔗 链式日本 → 🇯🇵 日本智能\n"
+        "- 🎬 影音娱乐 → 🇯🇵 日本智能（强制）\n\n"
+        f"作用范围：{groups}",
+        parse_mode='Markdown',
+        reply_markup=build_proxy_switch_keyboard()
+    )
+
+async def fetch_proxy_group(group_name):
+    """读取单个策略组信息：now=当前选择，all=可选项列表"""
+    url = f"{OPENCLASH_API_URL}/proxies/{quote(group_name, safe='')}"
+    headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+    response = await asyncio.to_thread(
+        requests.get,
+        url,
+        headers=headers,
+        timeout=10
+    )
+    if response.status_code != 200:
+        return None
+    data = response.json()
+    return {
+        "now": data.get("now"),
+        "all": data.get("all") or [],
+        "type": data.get("type"),
+    }
+
+async def set_proxy_selection(group_name, option_name):
+    """通过 OpenClash API 切换某策略组的当前选择"""
+    url = f"{OPENCLASH_API_URL}/proxies/{quote(group_name, safe='')}"
+    headers = {"Authorization": f"Bearer {OPENCLASH_API_SECRET}"}
+    response = await asyncio.to_thread(
+        requests.put,
+        url,
+        headers=headers,
+        json={"name": option_name},
+        timeout=10
+    )
+    return response.status_code
+
+async def switch_application_proxies(query, direction):
+    """批量切换应用策略组。direction: 'chain'=切到链式 | 'smart'=切回智能"""
+    if direction not in ("chain", "smart"):
+        await query.edit_message_text(
+            f"❌ 未知的切换方向：{direction}",
+            reply_markup=build_proxy_switch_keyboard()
+        )
+        return
+    direction_label = "🔗 切到链式" if direction == "chain" else "🧠 切回智能"
+    await query.edit_message_text(f"⏳ 正在执行：{direction_label} ...")
+
+    changed = []
+    skipped = []
+    failed = []
+
+    for group in PROXY_SWITCH_APPLICATION_GROUPS:
+        try:
+            info = await fetch_proxy_group(group)
+            if not info or info.get("now") is None:
+                failed.append(f"{group}（读取失败）")
+                continue
+
+            current = info["now"]
+            options = info["all"]
+
+            # 计算目标选择
+            if group == PROXY_SWITCH_FORCED_GROUP:
+                target = (
+                    PROXY_SWITCH_FORCED_CHAIN_VALUE
+                    if direction == "chain"
+                    else PROXY_SWITCH_FORCED_SMART_VALUE
+                )
+            else:
+                mapping = (
+                    PROXY_SWITCH_TO_CHAIN_MAP
+                    if direction == "chain"
+                    else PROXY_SWITCH_TO_SMART_MAP
+                )
+                target = mapping.get(current)
+
+            if target is None:
+                skipped.append(f"{group}（当前 {current}，不在切换范围）")
+                continue
+            if target == current:
+                skipped.append(f"{group}（已是 {target}）")
+                continue
+            if not options:
+                failed.append(f"{group}（无法获取可选项 all）")
+                continue
+            if target not in options:
+                failed.append(f"{group}（无可选项 {target}）")
+                continue
+
+            status_code = await set_proxy_selection(group, target)
+            if status_code in (200, 204):
+                changed.append(f"{group}：{current} → {target}")
+            else:
+                failed.append(f"{group}（API {status_code}）")
+        except Exception as e:
+            logger.error(f"切换策略组 {group} 失败: {str(e)}")
+            failed.append(f"{group}（异常 {str(e)[:40]}）")
+
+    title = f"✅ {direction_label} 完成" if not failed else f"⚠️ {direction_label} 部分失败"
+    lines = [f"{title}\n"]
+    if changed:
+        lines.append("🔄 已切换：\n" + "\n".join(f"• {item}" for item in changed))
+    if skipped:
+        lines.append("\n⏭️ 跳过：\n" + "\n".join(f"• {item}" for item in skipped))
+    if failed:
+        lines.append("\n⚠️ 失败：\n" + "\n".join(f"• {item}" for item in failed))
+    if not changed and not failed:
+        lines.append("ℹ️ 没有需要切换的策略组。")
+
+    text = "\n".join(lines)
+    if len(text) > 3500:
+        text = text[:3500] + "\n…（内容过长已截断）"
+
+    await query.edit_message_text(
+        text,
+        reply_markup=build_proxy_switch_keyboard()
     )
 
 # 油管解锁测试相关配置
@@ -2321,7 +2473,7 @@ async def run_youtube_unlock_test(query, provider):
             await query.edit_message_text(
                 f"✅ *{provider}* 油管解锁测试完成\n\n"
                 f"📋 *测试结果:*\n"
-                f"```\n{display_content}\n```\n\n"
+                f"\`\`\`\n{display_content}\n\`\`\`\n\n"
                 f"⏳ 正在自动更新送中节点规则...",
                 parse_mode='Markdown'
             )
