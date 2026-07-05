@@ -41,3 +41,6 @@ DOMAIN-SUFFIX,88code.org
 
 # 添加域名 reclaude.ai
 DOMAIN-SUFFIX,reclaude.ai
+
+# 添加IP 207.58.172.62
+IP-CIDR,207.58.172.62/32,no-resolve
