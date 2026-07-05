@@ -9,8 +9,10 @@ DOMAIN-SUFFIX,mujicv.com
 # 添加域名 nvidia.com
 DOMAIN-SUFFIX,nvidia.com
 
-# 添加域名 acedylan.us
-DOMAIN-SUFFIX,acedylan.us
+# 添加域名 lgjpv6.acedylan.us
+DOMAIN-SUFFIX,lgjpv6.acedylan.us
+DOMAIN-SUFFIX,lgv6.acedylan.us
+DOMAIN-SUFFIX,z.acedylan.us
 
 # 添加域名 samsung.com
 DOMAIN-SUFFIX,samsung.com
