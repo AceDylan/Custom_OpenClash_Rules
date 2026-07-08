@@ -48,5 +48,3 @@ IP-CIDR,207.58.172.62/32,no-resolve
 # 添加域名 host.acedylan.us
 DOMAIN-SUFFIX,host.acedylan.us
 
-# 添加域名 hostv6.acedylan.us
-DOMAIN-SUFFIX,hostv6.acedylan.us
