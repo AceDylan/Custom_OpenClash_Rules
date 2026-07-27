@@ -251,8 +251,12 @@ loop_clear_tasks = {}
 loop_clear_intervals = {}
 LOOP_CLEAR_INTERVAL_SECONDS = 10
 ALLOWED_LOOP_CLEAR_INTERVAL_SECONDS = (10, 20, 30)
-TARGET_CONNECTION_GROUPS = ("✈️ 机场前置",)
-TARGET_CONNECTION_SCOPE_LABEL = "✈️ 机场前置"
+TARGET_CONNECTION_GROUPS = (
+    "✈️ 机场前置",
+    "✈️ 机场新加坡",
+    "✈️ 机场日本",
+)
+TARGET_CONNECTION_SCOPE_LABEL = "三个机场前置组"
 # 循环清理前置：仅当目标策略组下载速率低于此门槛时才执行清理
 TARGET_DOWNLOAD_RATE_THRESHOLD_BPS = 3 * 1024 * 1024  # 3 MB/s
 TARGET_DOWNLOAD_RATE_SAMPLE_SECONDS = 2               # 测速采样窗口（秒）

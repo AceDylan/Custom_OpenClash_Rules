@@ -68,4 +68,11 @@ docker-compose restart
 cd /root/openclash-bot
 docker-compose down
 docker-compose up -d --build
-``` 
+```
+
+## 配置持久化说明
+
+- `setup.sh` 每次执行都会重新生成 `/root/openclash-bot/bot.py`、`Dockerfile` 和 `docker-compose.yml`，然后重建容器；因此机器人逻辑必须修改仓库中的 `setup.sh`，不能只改运行中容器的 `/app/bot.py`。
+- OpenClash 订阅转换以 `cfg/Custom_Clash.ini` 为源。三个机场前置组（`✈️ 机场前置`、`✈️ 机场新加坡`、`✈️ 机场日本`）应在该 INI 中维护，不能只修改生成后的 YAML。
+- 链式落地节点的 `dialer-proxy` 绑定由路由器本地 `/etc/openclash/custom/openclash_custom_overwrite.sh` 在配置生成后写入。该文件可包含私有落地服务器凭据，不应提交到公开仓库；修改前请备份，并确认 OpenClash 的自定义覆写功能已启用。
+- 更新仓库后重新运行 `setup.sh` 可让机器人同时识别三个机场前置组；OpenClash 重启或订阅更新后，应通过控制器 API/面板确认三个链式组仍分别使用对应前置。
