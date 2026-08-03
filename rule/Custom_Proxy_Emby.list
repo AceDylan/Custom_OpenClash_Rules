@@ -37,3 +37,6 @@ DOMAIN-SUFFIX,sub.joinmaosu.top
 
 # 添加域名 hk.tannel.asia
 DOMAIN-SUFFIX,hk.tannel.asia
+
+# 添加域名 rss.ccgfw.top
+DOMAIN-SUFFIX,rss.ccgfw.top
