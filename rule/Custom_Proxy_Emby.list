@@ -40,3 +40,6 @@ DOMAIN-SUFFIX,hk.tannel.asia
 
 # 添加域名 rss.ccgfw.top
 DOMAIN-SUFFIX,rss.ccgfw.top
+
+# 添加域名 tannel.asia
+DOMAIN-SUFFIX,tannel.asia
