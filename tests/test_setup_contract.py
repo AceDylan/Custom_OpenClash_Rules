@@ -85,6 +85,7 @@ class SetupContractTests(unittest.TestCase):
             "🇺🇸 美国节点",
             "🇸🇬 新加坡节点",
             "🇯🇵 日本节点",
+            "🔙 送中节点",
         )
 
         for group in allowlist:
@@ -92,9 +93,9 @@ class SetupContractTests(unittest.TestCase):
         self.assertIn("uci -q get openclash.config.smart_policy_priority", guide)
         self.assertIn('group["policy-priority"] = ENV.fetch("SMART_POLICY_PRIORITY")', guide)
         self.assertIn('group["uselightgbm"] = true', guide)
-        self.assertIn('send_to_china["type"] = "url-test"', guide)
-        self.assertIn('send_to_china.delete("policy-priority")', guide)
-        self.assertIn('send_to_china.delete("uselightgbm")', guide)
+        self.assertIn('group["type"] = "smart"', guide)
+        self.assertIn("上述八组必须同时具有 `type: smart`", guide)
+        self.assertIn("仓库中的 `cfg/Custom_Clash.ini` 仍以 `url-test` 定义 `🔙 送中节点`", guide)
         self.assertNotIn('ruby_arr_edit "$CONFIG_FILE"', guide)
 
     def test_compatibility_script_keeps_commands_times_and_new_mode_labels(self):

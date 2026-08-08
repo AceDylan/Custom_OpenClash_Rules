@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 import os
 from pathlib import Path
 import tempfile
@@ -38,6 +39,9 @@ CHAIN_TO_AIRPORT = {
     "🔗 链式新加坡": "✈️ 机场新加坡",
     "🔗 链式美国": "✈️ 机场前置",
 }
+
+SEND_TO_CHINA_SELECTOR = "🔙 送中组"
+SEND_TO_CHINA_NODE = "🔙 送中节点"
 
 
 class Controller(Protocol):
@@ -121,6 +125,12 @@ def default_state() -> dict[str, Any]:
         "version": 1,
         "night": {"failures": {}, "failovers": {}},
         "day": {"groups": {}},
+        "send_to_china": {
+            "active_applications": [],
+            "mode": None,
+            "degraded_count": 0,
+            "last_degraded_action_at": 0,
+        },
     }
 
 
@@ -153,6 +163,29 @@ def load_state(path: str | os.PathLike[str]) -> dict[str, Any]:
     day = loaded.get("day")
     if isinstance(day, dict) and isinstance(day.get("groups"), dict):
         state["day"]["groups"] = day["groups"]
+
+    send_to_china = loaded.get("send_to_china")
+    if isinstance(send_to_china, dict):
+        applications = send_to_china.get("active_applications")
+        if isinstance(applications, list):
+            state["send_to_china"]["active_applications"] = sorted(
+                item for item in applications if isinstance(item, str) and item
+            )
+        mode = send_to_china.get("mode")
+        if mode in ("day", "night"):
+            state["send_to_china"]["mode"] = mode
+        try:
+            degraded_count = int(send_to_china.get("degraded_count") or 0)
+        except (TypeError, ValueError):
+            degraded_count = 0
+        state["send_to_china"]["degraded_count"] = max(0, degraded_count)
+        try:
+            last_action_at = float(send_to_china.get("last_degraded_action_at") or 0)
+        except (TypeError, ValueError):
+            last_action_at = 0
+        state["send_to_china"]["last_degraded_action_at"] = (
+            max(0.0, last_action_at) if math.isfinite(last_action_at) else 0.0
+        )
     return state
 
 
@@ -277,6 +310,11 @@ class QoEWatchdog:
             for group_state in state["day"]["groups"].values():
                 if isinstance(group_state, dict):
                     group_state["degraded_count"] = 0
+            send_state = state["send_to_china"]
+            send_state["degraded_count"] = 0
+            send_state["active_applications"] = []
+            send_state["mode"] = None
+            send_state["leaf"] = None
             result = {
                 "mode": "unknown",
                 "actions": [],
@@ -302,10 +340,19 @@ class QoEWatchdog:
             if airport_group not in active_airports and isinstance(group_state, dict):
                 group_state["degraded_count"] = 0
 
+        samples = None
         if active_airports:
-            self._run_day(state, application_selections, active_airports, result)
+            samples = self._run_day(state, application_selections, active_airports, result)
         else:
             self._run_night(state, application_selections, result)
+
+        self._run_send_to_china(
+            state,
+            application_selections,
+            result["mode"],
+            result,
+            samples,
+        )
 
         atomic_write_json(self.state_path, state)
         return result
@@ -480,27 +527,19 @@ class QoEWatchdog:
         application_selections: dict[str, str],
         active_airports: set[str],
         result: dict[str, Any],
-    ) -> None:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], float] | None:
         del application_selections  # Mode was derived from this immutable snapshot.
         group_states = state["day"]["groups"]
         now = float(self.wall_clock())
 
-        try:
-            first = self.controller.get_connections()
-            if not isinstance(first, list):
-                raise TypeError("connections response is not a list")
-            sample_started = self.monotonic_clock()
-            self.sleeper(self.config.day_sample_seconds)
-            second = self.controller.get_connections()
-            if not isinstance(second, list):
-                raise TypeError("connections response is not a list")
-            elapsed = self.monotonic_clock() - sample_started
-        except Exception:
+        samples = self._sample_connections()
+        if samples is None:
             for airport_group in active_airports:
                 group_state = self._day_group_state(group_states, airport_group)
                 group_state["degraded_count"] = 0
             result["notes"].append("connection sampling unavailable")
-            return
+            return None
+        first, second, elapsed = samples
 
         deleted_ids: set[str] = set()
         for airport_group in sorted(active_airports):
@@ -553,8 +592,140 @@ class QoEWatchdog:
 
             group_state["degraded_count"] = 0
             group_state["last_action_at"] = now
+            if cleared:
+                result["actions"].append(
+                    f"{airport_group}: reset {cleared} matching connection(s), {failed} failed"
+                )
+
+        return first, second, elapsed
+
+    def _sample_connections(
+        self,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], float] | None:
+        try:
+            first = self.controller.get_connections()
+            if not isinstance(first, list):
+                raise TypeError("connections response is not a list")
+            sample_started = self.monotonic_clock()
+            self.sleeper(self.config.day_sample_seconds)
+            second = self.controller.get_connections()
+            if not isinstance(second, list):
+                raise TypeError("connections response is not a list")
+            return first, second, self.monotonic_clock() - sample_started
+        except Exception:
+            return None
+
+    def _application_snapshot_unchanged(
+        self,
+        expected: dict[str, str],
+    ) -> bool:
+        current, unreadable = self._application_selections()
+        return not unreadable and current == expected
+
+    @staticmethod
+    def _matching_connection_ids(
+        connections: Sequence[dict[str, Any]],
+        group: str,
+    ) -> set[str]:
+        return set(_connection_downloads(connections, group))
+
+    def _delete_matching_connections(
+        self,
+        connection_ids: set[str],
+    ) -> tuple[int, int]:
+        cleared = 0
+        failed = 0
+        for connection_id in sorted(connection_ids):
+            try:
+                succeeded = bool(self.controller.delete_connection(connection_id))
+            except Exception:
+                succeeded = False
+            if succeeded:
+                cleared += 1
+            else:
+                failed += 1
+        return cleared, failed
+
+    def _run_send_to_china(
+        self,
+        state: dict[str, Any],
+        application_selections: dict[str, str],
+        mode: str,
+        result: dict[str, Any],
+        samples: tuple[list[dict[str, Any]], list[dict[str, Any]], float] | None,
+    ) -> None:
+        send_state = state["send_to_china"]
+        active_applications = sorted(
+            application
+            for application, current in application_selections.items()
+            if current == SEND_TO_CHINA_SELECTOR
+        )
+        previous_applications = send_state.get("active_applications", [])
+        if not isinstance(previous_applications, list):
+            previous_applications = []
+        previous_mode = send_state.get("mode")
+        has_previous_context = bool(previous_applications) or previous_mode in ("day", "night")
+        context_changed = has_previous_context and (
+            previous_applications != active_applications or previous_mode != mode
+        )
+        send_state["active_applications"] = active_applications
+        send_state["mode"] = mode if active_applications else None
+
+        if not active_applications:
+            send_state["degraded_count"] = 0
+            return
+        if not has_previous_context or context_changed:
+            # Establish a baseline on first activation or after topology/app changes.
+            send_state["degraded_count"] = 0
+            return
+        if samples is None:
+            samples = self._sample_connections()
+        if samples is None:
+            send_state["degraded_count"] = 0
+            result["notes"].append("send-to-China connection sampling unavailable")
+            return
+
+        first, second, elapsed = samples
+        rate_bps, second_ids = stable_download_rate(
+            first,
+            second,
+            SEND_TO_CHINA_NODE,
+            elapsed,
+        )
+        if rate_bps is None:
+            send_state["degraded_count"] = 0
+            result["notes"].append(f"{SEND_TO_CHINA_NODE}: no stable active samples")
+            return
+        if rate_bps >= self.config.day_low_rate_bps:
+            send_state["degraded_count"] = 0
+            return
+
+        delay = self._probe(SEND_TO_CHINA_NODE)
+        if not self._delay_is_bad(delay):
+            send_state["degraded_count"] = 0
+            return
+
+        degraded_count = int(send_state.get("degraded_count") or 0) + 1
+        send_state["degraded_count"] = degraded_count
+        if degraded_count < self.config.day_failure_strikes:
+            return
+
+        now = float(self.wall_clock())
+        last_action_at = float(send_state.get("last_degraded_action_at") or 0)
+        if last_action_at > 0 and now - last_action_at < self.config.day_cooldown_seconds:
+            return
+        if not self._application_snapshot_unchanged(application_selections):
+            send_state["degraded_count"] = 0
+            result["notes"].append("send-to-China selector changed during sampling")
+            return
+
+        cleared, failed = self._delete_matching_connections(second_ids)
+        send_state["degraded_count"] = 0
+        if cleared:
+            send_state["last_degraded_action_at"] = now
             result["actions"].append(
-                f"{airport_group}: reset {cleared} matching connection(s), {failed} failed"
+                f"{SEND_TO_CHINA_NODE}: degraded QoE, reset {cleared} matching "
+                f"connection(s), {failed} failed"
             )
 
     @staticmethod

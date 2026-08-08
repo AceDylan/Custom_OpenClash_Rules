@@ -22,6 +22,9 @@ from qoe_watchdog import (  # noqa: E402
 
 
 APP = "💬 社交媒体"
+SEND_APP = "🎬 影音娱乐"
+SEND_SELECTOR = "🔙 送中组"
+SEND_NODE = "🔙 送中节点"
 SMART = "🇺🇸 美国智能"
 AIRPORT = "🇺🇸 美国节点"
 MANUAL = "🇺🇸 美国手选"
@@ -266,6 +269,97 @@ class QoEWatchdogTests(unittest.TestCase):
 
         self.assertEqual(selections_before, controller.selections)
         self.assertNotIn(APP, load_state(self.state_path)["night"]["failovers"])
+
+    def test_send_to_china_activation_establishes_baseline_without_reset(self):
+        groups = {
+            SEND_APP: {"now": "🎯 全球直连", "all": [SEND_SELECTOR, "🎯 全球直连"]},
+            SEND_NODE: {"now": "Smart - Select", "all": ["send-leaf-a", "send-leaf-b"]},
+        }
+        controller = FakeController(
+            groups,
+            delays={SEND_NODE: 100},
+            connection_samples=[
+                [{"id": "new", "download": 10, "chains": [SEND_NODE]}],
+            ],
+        )
+        watchdog = QoEWatchdog(
+            controller,
+            self.state_path,
+            config=QoEConfig(application_groups=(SEND_APP,)),
+            wall_clock=self.wall,
+            monotonic_clock=self.mono,
+            sleeper=self.mono.sleep,
+        )
+
+        watchdog.run_once()
+        controller.groups[SEND_APP]["now"] = SEND_SELECTOR
+        result = watchdog.run_once()
+
+        self.assertEqual([], controller.deleted)
+        self.assertEqual([], result["actions"])
+        self.assertEqual(0, load_state(self.state_path)["send_to_china"]["degraded_count"])
+
+    def test_send_to_china_degraded_qoe_requires_three_runs_and_cooldown(self):
+        groups = {
+            SEND_APP: {"now": SEND_SELECTOR, "all": [SEND_SELECTOR]},
+            SEND_NODE: {"now": "send-leaf", "all": ["send-leaf"]},
+        }
+        controller = FakeController(
+            groups,
+            delays={SEND_NODE: 2_000},
+            connection_samples=low_rate_samples(SEND_NODE) * 7,
+        )
+        watchdog = QoEWatchdog(
+            controller,
+            self.state_path,
+            config=QoEConfig(application_groups=(SEND_APP,)),
+            wall_clock=self.wall,
+            monotonic_clock=self.mono,
+            sleeper=self.mono.sleep,
+        )
+
+        for _ in range(4):
+            result = watchdog.run_once()
+        self.assertEqual(["target"], controller.deleted)
+        self.assertTrue(any("degraded QoE" in action for action in result["actions"]))
+
+        for _ in range(3):
+            watchdog.run_once()
+        self.assertEqual(["target"], controller.deleted)
+
+        self.wall.value = 1_600
+        result = watchdog.run_once()
+        self.assertEqual(["target", "target"], controller.deleted)
+        self.assertTrue(any("degraded QoE" in action for action in result["actions"]))
+
+    def test_send_to_china_healthy_or_inactive_resets_without_mutation(self):
+        groups = {
+            SEND_APP: {"now": SEND_SELECTOR, "all": [SEND_SELECTOR, "🎯 全球直连"]},
+            SEND_NODE: {"now": "send-leaf", "all": ["send-leaf"]},
+        }
+        controller = FakeController(
+            groups,
+            delays={SEND_NODE: 100},
+            connection_samples=low_rate_samples(SEND_NODE) * 3,
+        )
+        watchdog = QoEWatchdog(
+            controller,
+            self.state_path,
+            config=QoEConfig(application_groups=(SEND_APP,)),
+            wall_clock=self.wall,
+            monotonic_clock=self.mono,
+            sleeper=self.mono.sleep,
+        )
+
+        for _ in range(3):
+            watchdog.run_once()
+        self.assertEqual([], controller.deleted)
+        self.assertEqual(0, load_state(self.state_path)["send_to_china"]["degraded_count"])
+
+        controller.groups[SEND_APP]["now"] = "🎯 全球直连"
+        watchdog.run_once()
+        self.assertEqual([], controller.deleted)
+        self.assertEqual([], load_state(self.state_path)["send_to_china"]["active_applications"])
 
     def test_incomplete_application_snapshot_makes_no_mutation_and_breaks_strikes(self):
         controller = FakeController(night_groups(), delays={SMART: None})
