@@ -3,17 +3,17 @@
 # 通过容器内 bot.py 的 switch_application_proxies 调 OpenClash API 批量切换应用策略组
 #
 # 用法：
-#   auto_proxy_switch.sh chain   # 🔗 切到链式（直连智能 → 链式前置）
-#   auto_proxy_switch.sh smart   # 🧠 切回智能（链式前置 → 直连智能）
+#   auto_proxy_switch.sh chain   # ☀️ 白天机场→VPS（切到链式前置）
+#   auto_proxy_switch.sh smart   # 🌙 夜间VPS优先（切回地区智能）
 #
-# 典型 crontab（每天凌晨 1 点切到链式，每天 18:00 切回智能）：
+# 兼容 crontab（01:00 进入白天机场→VPS，18:00 进入夜间VPS优先）：
 #   0 1  * * * /root/openclash-bot/auto_proxy_switch.sh chain >> /root/openclash-bot/cron.log 2>&1
 #   0 18 * * * /root/openclash-bot/auto_proxy_switch.sh smart >> /root/openclash-bot/cron.log 2>&1
 
 DIRECTION="$1"
 case "$DIRECTION" in
-    chain) LABEL="🔗 切到链式" ;;
-    smart) LABEL="🧠 切回智能" ;;
+    chain) LABEL="☀️ 白天机场→VPS" ;;
+    smart) LABEL="🌙 夜间VPS优先" ;;
     *) echo "用法: $0 chain|smart"; exit 1 ;;
 esac
 

@@ -1,5 +1,7 @@
 #!/bin/sh
 
+SETUP_SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
 # 检查必要文件是否存在
 check_file() {
     if [ ! -f "$1" ]; then
@@ -26,6 +28,29 @@ opkg install git-http docker docker-compose coreutils-nohup
 # 创建工作目录
 mkdir -p /root/openclash-bot
 cd /root/openclash-bot
+
+# 安装可独立测试的 QoE watchdog 模块。仓库内执行时直接复制；仅下载 setup.sh
+# 执行时从同一公开仓库获取，避免在生成的 bot.py 中复制一份决策逻辑。
+QOE_WATCHDOG_SOURCE="${SETUP_SOURCE_DIR}/qoe_watchdog.py"
+QOE_WATCHDOG_DEST="/root/openclash-bot/qoe_watchdog.py"
+if [ -f "${QOE_WATCHDOG_SOURCE}" ]; then
+    if [ "${QOE_WATCHDOG_SOURCE}" != "${QOE_WATCHDOG_DEST}" ]; then
+        cp "${QOE_WATCHDOG_SOURCE}" "${QOE_WATCHDOG_DEST}"
+    fi
+else
+    QOE_WATCHDOG_URL="https://raw.githubusercontent.com/AceDylan/Custom_OpenClash_Rules/main/openclash-rule-bot/qoe_watchdog.py"
+    QOE_WATCHDOG_TMP="${QOE_WATCHDOG_DEST}.tmp"
+    if command -v wget >/dev/null 2>&1; then
+        wget -O "${QOE_WATCHDOG_TMP}" "${QOE_WATCHDOG_URL}" || exit 1
+    elif command -v curl >/dev/null 2>&1; then
+        curl -fsSL -o "${QOE_WATCHDOG_TMP}" "${QOE_WATCHDOG_URL}" || exit 1
+    else
+        echo "错误：无法下载 qoe_watchdog.py（需要 wget 或 curl）"
+        exit 1
+    fi
+    mv "${QOE_WATCHDOG_TMP}" "${QOE_WATCHDOG_DEST}"
+fi
+check_file "${QOE_WATCHDOG_DEST}" || exit 1
 
 # 读取令牌值
 TELEGRAM_TOKEN=$(cat /root/TELEGRAM_TOKEN.txt)
@@ -199,6 +224,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import git
 from youtube_config_filter import prepare_youtube_check_config
+from qoe_watchdog import QoEConfig, QoEWatchdog, format_watchdog_result
 
 nest_asyncio.apply()
 
@@ -275,17 +301,98 @@ PROXY_SWITCH_APPLICATION_GROUPS = (
 PROXY_SWITCH_FORCED_GROUP = "🎬 影音娱乐"
 PROXY_SWITCH_FORCED_CHAIN_VALUE = "🔙 送中组"
 PROXY_SWITCH_FORCED_SMART_VALUE = "🇯🇵 日本智能"
-# 通用组按当前选中值映射（未命中的值，如香港/直连，保持不变）
+# 通用组按当前选中值映射。地区节点也必须参与定时拓扑切换，以便定时任务
+# 能覆盖 watchdog 的临时 failover；未命中的值（如香港/直连）保持不变。
 PROXY_SWITCH_TO_CHAIN_MAP = {
     "🇺🇸 美国智能": "🔗 链式美国",
+    "🇺🇸 美国节点": "🔗 链式美国",
     "🇸🇬 新加坡智能": "🔗 链式新加坡",
+    "🇸🇬 新加坡节点": "🔗 链式新加坡",
     "🇯🇵 日本智能": "🔗 链式日本",
+    "🇯🇵 日本节点": "🔗 链式日本",
 }
 PROXY_SWITCH_TO_SMART_MAP = {
+    "🇭🇰 香港节点": "🇭🇰 香港智能",
     "🔗 链式美国": "🇺🇸 美国智能",
+    "🇺🇸 美国节点": "🇺🇸 美国智能",
     "🔗 链式新加坡": "🇸🇬 新加坡智能",
+    "🇸🇬 新加坡节点": "🇸🇬 新加坡智能",
     "🔗 链式日本": "🇯🇵 日本智能",
+    "🇯🇵 日本节点": "🇯🇵 日本智能",
 }
+
+QOE_WATCHDOG_STATE_PATH = "/app/state/qoe_watchdog.json"
+
+
+class OpenClashQoEController:
+    """Synchronous OpenClash API adapter used by the one-shot watchdog."""
+
+    def __init__(self, base_url, secret):
+        self.base_url = base_url.rstrip("/")
+        self.headers = {"Authorization": f"Bearer {secret}"}
+
+    def get_proxy(self, name):
+        response = requests.get(
+            f"{self.base_url}/proxies/{quote(name, safe='')}",
+            headers=self.headers,
+            timeout=10,
+        )
+        if response.status_code != 200:
+            return None
+        return response.json()
+
+    def set_proxy(self, group, option):
+        response = requests.put(
+            f"{self.base_url}/proxies/{quote(group, safe='')}",
+            headers=self.headers,
+            json={"name": option},
+            timeout=10,
+        )
+        return response.status_code in (200, 204)
+
+    def probe_delay(self, name, url, timeout_ms):
+        response = requests.get(
+            f"{self.base_url}/proxies/{quote(name, safe='')}/delay",
+            headers=self.headers,
+            params={"url": url, "timeout": timeout_ms},
+            timeout=max(2, timeout_ms / 1000 + 2),
+        )
+        if response.status_code != 200:
+            return None
+        return response.json().get("delay")
+
+    def get_connections(self):
+        response = requests.get(
+            f"{self.base_url}/connections",
+            headers=self.headers,
+            timeout=10,
+        )
+        response.raise_for_status()
+        connections = response.json().get("connections")
+        if not isinstance(connections, list):
+            raise ValueError("OpenClash /connections did not return a list")
+        return connections
+
+    def delete_connection(self, connection_id):
+        response = requests.delete(
+            f"{self.base_url}/connections/{quote(str(connection_id), safe='')}",
+            headers=self.headers,
+            timeout=10,
+        )
+        return response.status_code in (200, 204, 404)
+
+
+def run_qoe_watchdog_once():
+    """Run one mode-aware watchdog pass for cron/non-interactive callers."""
+
+    controller = OpenClashQoEController(OPENCLASH_API_URL, OPENCLASH_API_SECRET)
+    config = QoEConfig.from_env(PROXY_SWITCH_APPLICATION_GROUPS)
+    watchdog = QoEWatchdog(
+        controller,
+        QOE_WATCHDOG_STATE_PATH,
+        config=config,
+    )
+    return format_watchdog_result(watchdog.run_once())
 
 # 每页显示的规则条数
 RULES_PER_PAGE = 10
@@ -2990,6 +3097,7 @@ FROM python:3.11-slim-bookworm
 WORKDIR /app
 
 COPY bot.py /app/
+COPY qoe_watchdog.py /app/
 COPY youtube_config_filter.py /app/
 COPY requirements.txt /app/
 
@@ -3020,9 +3128,10 @@ RUN set -ex && \
     rm -rf /var/lib/apt/lists/* && \
     # 安装 Python 依赖
     pip install --no-cache-dir -r requirements.txt && \
-    # 创建仓库目录
-    mkdir -p /app/repo && \
-    chmod -R 777 /app/repo
+    # 创建仓库和 watchdog 状态目录
+    mkdir -p /app/repo /app/state && \
+    chmod -R 777 /app/repo && \
+    chmod 700 /app/state
 
 # 安装 Go（从本地文件，避免网络问题）
 # Go 必须在容器内安装，不能从宿主机挂载（因为 OpenWrt 使用 musl libc，而容器使用 glibc）
@@ -3081,14 +3190,84 @@ services:
     network_mode: "host"
     volumes:
       - ./repo:/app/repo
+      - ./state:/app/state
       - /root/clash-speedtest:/root/clash-speedtest
       - /root/go:/root/go
     environment:
       - TZ=Asia/Shanghai
+      - QOE_PROBE_URL=${QOE_PROBE_URL:-https://www.gstatic.com/generate_204}
+      - QOE_PROBE_TIMEOUT_MS=${QOE_PROBE_TIMEOUT_MS:-5000}
+      - QOE_HIGH_DELAY_MS=${QOE_HIGH_DELAY_MS:-1500}
 EOF
 
-# 创建repo目录
-mkdir -p repo
+# 创建 repo 与持久化状态目录
+mkdir -p repo state
+chmod 700 state
+
+# 生成每两分钟执行一次的 QoE watchdog 宿主机脚本。无动作只写日志；发生
+# 定向切换/清理时才发 Telegram，避免正常巡检产生通知噪音。
+cat > auto_qoe_watchdog.sh << 'EOF'
+#!/bin/sh
+
+WATCHDOG_LOCK_DIR="/tmp/openclash-auto-qoe-watchdog.lock"
+if ! mkdir "${WATCHDOG_LOCK_DIR}" 2>/dev/null; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] QoE watchdog 已在运行，本轮跳过"
+    exit 0
+fi
+# trap 0 is portable to BusyBox ash and removes the atomic mkdir lock on every
+# normal/error exit. Signal traps exit first, then the trap 0 cleanup runs.
+trap 'rmdir "${WATCHDOG_LOCK_DIR}" 2>/dev/null || :' 0
+trap 'exit 1' 1 2 3 15
+
+TELEGRAM_TOKEN=$(cat /root/TELEGRAM_TOKEN.txt)
+CHAT_ID=$(cat /root/AUTHORIZED_USER_ID.txt)
+
+send_message() {
+    curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+        -d "chat_id=${CHAT_ID}" \
+        --data-urlencode "text=$1" >/dev/null
+}
+
+OUTPUT=$(docker exec openclash-rule-bot python3 -c "
+import sys
+sys.path.insert(0, '/app')
+from bot import run_qoe_watchdog_once
+
+print('===QOE_RESULT===')
+print(run_qoe_watchdog_once())
+" 2>&1)
+STATUS=$?
+
+if [ "${STATUS}" -ne 0 ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] QoE watchdog 执行失败（docker exec ${STATUS}）"
+    exit "${STATUS}"
+fi
+
+FINAL=$(printf '%s\n' "${OUTPUT}" | sed -n '/===QOE_RESULT===/,$p' | tail -n +2 | tail -n 1)
+case "${FINAL}" in
+    ACTION\|*)
+        MESSAGE=${FINAL#ACTION|}
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${MESSAGE}"
+        send_message "${MESSAGE}"
+        ;;
+    OK\|*)
+        MESSAGE=${FINAL#OK|}
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${MESSAGE}"
+        ;;
+    *)
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] QoE watchdog 未返回有效结果"
+        exit 1
+        ;;
+esac
+EOF
+chmod +x auto_qoe_watchdog.sh
+
+# 幂等安装 watchdog cron；保留所有其他任务（包括 01:00 chain 与 18:00 smart）。
+QOE_CRON_ENTRY='*/2 * * * * /root/openclash-bot/auto_qoe_watchdog.sh >> /root/openclash-bot/qoe_watchdog.log 2>&1'
+(
+    crontab -l 2>/dev/null | sed '\|/root/openclash-bot/auto_qoe_watchdog.sh|d'
+    echo "${QOE_CRON_ENTRY}"
+) | crontab -
 
 # 检查授权用户ID文件是否存在
 if [ ! -f /root/AUTHORIZED_USER_ID.txt ]; then
