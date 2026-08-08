@@ -90,14 +90,93 @@ def night_groups():
 def low_rate_samples(target_group=FRONT):
     return [
         [
-            {"id": "target", "download": 10 * 1024 * 1024, "chains": [target_group]},
+            {
+                "id": "target",
+                "download": 10 * 1024 * 1024,
+                "start": "1970-01-01T00:15:00Z",
+                "chains": [target_group],
+            },
             {"id": "other", "download": 20, "chains": ["✈️ 机场日本"]},
         ],
         [
-            {"id": "target", "download": 12 * 1024 * 1024, "chains": [target_group]},
+            {
+                "id": "target",
+                "download": 12 * 1024 * 1024,
+                "start": "1970-01-01T00:15:00Z",
+                "chains": [target_group],
+            },
             {"id": "other", "download": 40, "chains": ["✈️ 机场日本"]},
         ],
     ]
+
+
+def throttled_flow_samples(target_group=FRONT, *, include_small_web=False):
+    first = [
+        {
+            "id": "sustained",
+            "download": 8 * 1024 * 1024,
+            "start": "1970-01-01T00:15:00Z",
+            "chains": [target_group],
+        }
+    ]
+    second = [
+        {
+            "id": "sustained",
+            "download": 8 * 1024 * 1024 + 512 * 1024,
+            "start": "1970-01-01T00:15:00Z",
+            "chains": [target_group],
+        }
+    ]
+    if include_small_web:
+        first.append(
+            {
+                "id": "small-web",
+                "download": 64 * 1024,
+                "start": "1970-01-01T00:15:00Z",
+                "chains": [target_group],
+            }
+        )
+        second.append(
+            {
+                "id": "small-web",
+                "download": 96 * 1024,
+                "start": "1970-01-01T00:15:00Z",
+                "chains": [target_group],
+            }
+        )
+    return [first, second]
+
+
+def small_web_samples(target_group=FRONT):
+    return [
+        [
+            {
+                "id": "small-web",
+                "download": 64 * 1024,
+                "start": "1970-01-01T00:15:00Z",
+                "chains": [target_group],
+            }
+        ],
+        [
+            {
+                "id": "small-web",
+                "download": 96 * 1024,
+                "start": "1970-01-01T00:15:00Z",
+                "chains": [target_group],
+            }
+        ],
+    ]
+
+
+def zero_progress_samples(target_group=FRONT):
+    first = {
+        "id": "idle",
+        "download": 8 * 1024 * 1024,
+        "start": "1970-01-01T00:15:00Z",
+        "chains": [target_group],
+    }
+    second = dict(first)
+    return [[first], [second]]
 
 
 class QoEWatchdogTests(unittest.TestCase):
@@ -332,6 +411,130 @@ class QoEWatchdogTests(unittest.TestCase):
         self.assertEqual(["target", "target"], controller.deleted)
         self.assertTrue(any("degraded QoE" in action for action in result["actions"]))
 
+    def test_send_to_china_ignores_single_small_web_request_even_with_bad_delay(self):
+        groups = {
+            SEND_APP: {"now": SEND_SELECTOR, "all": [SEND_SELECTOR]},
+            SEND_NODE: {"now": "send-leaf", "all": ["send-leaf"]},
+        }
+        controller = FakeController(
+            groups,
+            delays={SEND_NODE: None},
+            connection_samples=small_web_samples(SEND_NODE) * 3,
+        )
+        watchdog = QoEWatchdog(
+            controller,
+            self.state_path,
+            config=QoEConfig(application_groups=(SEND_APP,)),
+            wall_clock=self.wall,
+            monotonic_clock=self.mono,
+            sleeper=self.mono.sleep,
+        )
+
+        for _ in range(4):
+            watchdog.run_once()
+
+        self.assertEqual([], controller.probes)
+        self.assertEqual([], controller.deleted)
+        self.assertEqual(0, load_state(self.state_path)["send_to_china"]["degraded_count"])
+
+    def test_send_to_china_sustained_throttled_flow_triggers_with_healthy_delay(self):
+        groups = {
+            SEND_APP: {"now": SEND_SELECTOR, "all": [SEND_SELECTOR]},
+            SEND_NODE: {"now": "send-leaf", "all": ["send-leaf"]},
+        }
+        controller = FakeController(
+            groups,
+            delays={SEND_NODE: 100},
+            connection_samples=throttled_flow_samples(SEND_NODE) * 3,
+        )
+        watchdog = QoEWatchdog(
+            controller,
+            self.state_path,
+            config=QoEConfig(application_groups=(SEND_APP,)),
+            wall_clock=self.wall,
+            monotonic_clock=self.mono,
+            sleeper=self.mono.sleep,
+        )
+
+        watchdog.run_once()  # Establish activation context without consuming samples.
+        watchdog.run_once()
+        watchdog.run_once()
+        self.assertEqual([], controller.deleted)
+        result = watchdog.run_once()
+
+        self.assertEqual(["sustained"], controller.deleted)
+        self.assertTrue(any("degraded QoE" in action for action in result["actions"]))
+
+    def test_send_to_china_without_stable_samples_is_ignored(self):
+        groups = {
+            SEND_APP: {"now": SEND_SELECTOR, "all": [SEND_SELECTOR]},
+            SEND_NODE: {"now": "send-leaf", "all": ["send-leaf"]},
+        }
+        unstable = [
+            [
+                {
+                    "id": "old",
+                    "download": 8 * 1024 * 1024,
+                    "start": "1970-01-01T00:15:00Z",
+                    "chains": [SEND_NODE],
+                }
+            ],
+            [
+                {
+                    "id": "new",
+                    "download": 9 * 1024 * 1024,
+                    "start": "1970-01-01T00:15:00Z",
+                    "chains": [SEND_NODE],
+                }
+            ],
+        ]
+        controller = FakeController(
+            groups,
+            delays={SEND_NODE: None},
+            connection_samples=unstable,
+        )
+        watchdog = QoEWatchdog(
+            controller,
+            self.state_path,
+            config=QoEConfig(application_groups=(SEND_APP,)),
+            wall_clock=self.wall,
+            monotonic_clock=self.mono,
+            sleeper=self.mono.sleep,
+        )
+
+        watchdog.run_once()
+        watchdog.run_once()
+
+        self.assertEqual([], controller.probes)
+        self.assertEqual([], controller.deleted)
+        self.assertEqual(0, load_state(self.state_path)["send_to_china"]["degraded_count"])
+
+    def test_send_to_china_ignores_historically_large_zero_progress_flow(self):
+        groups = {
+            SEND_APP: {"now": SEND_SELECTOR, "all": [SEND_SELECTOR]},
+            SEND_NODE: {"now": "send-leaf", "all": ["send-leaf"]},
+        }
+        controller = FakeController(
+            groups,
+            delays={SEND_NODE: None},
+            connection_samples=zero_progress_samples(SEND_NODE) * 3,
+        )
+        watchdog = QoEWatchdog(
+            controller,
+            self.state_path,
+            config=QoEConfig(application_groups=(SEND_APP,)),
+            wall_clock=self.wall,
+            monotonic_clock=self.mono,
+            sleeper=self.mono.sleep,
+        )
+
+        for _ in range(4):
+            watchdog.run_once()
+            self.assertEqual(0, load_state(self.state_path)["send_to_china"]["degraded_count"])
+
+        self.assertEqual([], controller.probes)
+        self.assertEqual([], controller.deleted)
+
     def test_send_to_china_healthy_or_inactive_resets_without_mutation(self):
         groups = {
             SEND_APP: {"now": SEND_SELECTOR, "all": [SEND_SELECTOR, "🎯 全球直连"]},
@@ -409,6 +612,54 @@ class QoEWatchdogTests(unittest.TestCase):
         self.assertEqual([], controller.deleted)
         self.assertEqual(0, load_state(self.state_path)["day"]["groups"][FRONT]["degraded_count"])
 
+    def test_day_ignores_single_small_web_request_even_with_bad_delay(self):
+        groups = {APP: {"now": CHAIN, "all": [CHAIN]}}
+        controller = FakeController(
+            groups,
+            delays={FRONT: None},
+            connection_samples=small_web_samples() * 3,
+        )
+        watchdog = self.watchdog(controller)
+
+        for _ in range(3):
+            watchdog.run_once()
+
+        self.assertEqual([], controller.probes)
+        self.assertEqual([], controller.deleted)
+        self.assertEqual(0, load_state(self.state_path)["day"]["groups"][FRONT]["degraded_count"])
+
+    def test_day_sustained_throttled_flow_triggers_with_healthy_delay(self):
+        groups = {APP: {"now": CHAIN, "all": [CHAIN]}}
+        controller = FakeController(
+            groups,
+            delays={FRONT: 100},
+            connection_samples=throttled_flow_samples() * 3,
+        )
+        watchdog = self.watchdog(controller)
+
+        watchdog.run_once()
+        watchdog.run_once()
+        self.assertEqual([], controller.deleted)
+        result = watchdog.run_once()
+
+        self.assertEqual(["sustained"], controller.deleted)
+        self.assertTrue(result["actions"])
+
+    def test_day_mixed_web_and_sustained_flow_only_qualifies_sustained_flow(self):
+        groups = {APP: {"now": CHAIN, "all": [CHAIN]}}
+        controller = FakeController(
+            groups,
+            delays={FRONT: 100},
+            connection_samples=throttled_flow_samples(include_small_web=True) * 3,
+        )
+        watchdog = self.watchdog(controller)
+
+        for _ in range(3):
+            watchdog.run_once()
+
+        self.assertEqual(["sustained"], controller.deleted)
+        self.assertNotIn("small-web", controller.deleted)
+
     def test_day_without_stable_active_samples_does_not_degrade_or_act(self):
         groups = {APP: {"now": CHAIN, "all": [CHAIN]}}
         samples = [
@@ -423,6 +674,22 @@ class QoEWatchdogTests(unittest.TestCase):
         self.assertEqual([], controller.deleted)
         self.assertEqual([], controller.probes)
         self.assertEqual(0, load_state(self.state_path)["day"]["groups"][FRONT]["degraded_count"])
+
+    def test_day_ignores_historically_large_zero_progress_flow(self):
+        groups = {APP: {"now": CHAIN, "all": [CHAIN]}}
+        controller = FakeController(
+            groups,
+            delays={FRONT: None},
+            connection_samples=zero_progress_samples() * 3,
+        )
+        watchdog = self.watchdog(controller)
+
+        for _ in range(3):
+            watchdog.run_once()
+            self.assertEqual(0, load_state(self.state_path)["day"]["groups"][FRONT]["degraded_count"])
+
+        self.assertEqual([], controller.probes)
+        self.assertEqual([], controller.deleted)
 
     def test_day_action_deletes_only_connections_with_matching_airport_chain(self):
         groups = {APP: {"now": CHAIN, "all": [CHAIN]}}
@@ -483,6 +750,9 @@ class QoEWatchdogTests(unittest.TestCase):
                 "QOE_PROBE_URL": "https://probe.example/generate_204",
                 "QOE_PROBE_TIMEOUT_MS": "7000",
                 "QOE_HIGH_DELAY_MS": "1200",
+                "QOE_ACTIVE_FLOW_MIN_AGE_SECONDS": "12.5",
+                "QOE_ACTIVE_FLOW_MIN_BYTES": "6291456",
+                "QOE_LOW_RATE_DIRECT_TRIGGER_BPS": "262144",
             },
         ):
             config = QoEConfig.from_env((APP,))
@@ -490,6 +760,9 @@ class QoEWatchdogTests(unittest.TestCase):
         self.assertEqual("https://probe.example/generate_204", config.probe_url)
         self.assertEqual(7_000, config.probe_timeout_ms)
         self.assertEqual(1_200, config.high_delay_ms)
+        self.assertEqual(12.5, config.active_flow_min_age_seconds)
+        self.assertEqual(6 * 1024 * 1024, config.active_flow_min_bytes)
+        self.assertEqual(256 * 1024, config.low_rate_direct_trigger_bps)
 
 
 class AtomicStateTests(unittest.TestCase):

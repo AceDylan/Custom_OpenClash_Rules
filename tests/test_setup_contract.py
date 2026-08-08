@@ -36,6 +36,21 @@ class SetupContractTests(unittest.TestCase):
         self.assertIn("auto_qoe_watchdog.sh", setup)
         self.assertIn("*/2 * * * *", setup)
 
+    def test_setup_and_deploy_guide_expose_active_flow_qoe_settings(self):
+        setup = setup_text()
+        guide = (ROOT / "openclash-rule-bot" / "DEPLOY_GUIDE.md").read_text(
+            encoding="utf-8"
+        )
+        settings = {
+            "QOE_ACTIVE_FLOW_MIN_AGE_SECONDS": "10",
+            "QOE_ACTIVE_FLOW_MIN_BYTES": "4194304",
+            "QOE_LOW_RATE_DIRECT_TRIGGER_BPS": "524288",
+        }
+
+        for name, default in settings.items():
+            self.assertIn(f"{name}=${{{name}:-{default}}}", setup)
+            self.assertIn(f"export {name}='{default}'", guide)
+
     def test_scheduled_topology_maps_recover_watchdog_node_failovers(self):
         to_chain = generated_bot_mapping("PROXY_SWITCH_TO_CHAIN_MAP")
         to_smart = generated_bot_mapping("PROXY_SWITCH_TO_SMART_MAP")

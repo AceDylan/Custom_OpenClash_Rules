@@ -144,11 +144,11 @@ failover 会在 `probe_group` 字段记录被探测的原始智能组。只有�
 链式美国     → 机场前置
 ```
 
-watchdog 从 `/connections` 取两次样本，间隔默认 2 秒，只统计两次都存在且 chains 命中该机场组的连接 ID。没有稳定活跃样本视为“无退化”，不会探测或清理。
+watchdog 从 `/connections` 取两次样本，间隔默认 2 秒，并按连接 ID、路由分别判断。吞吐 QoE 只接受同时满足以下条件的活跃流：两次样本都存在且 chains 均命中目标组；连接 `start` 显示在第一次样本时已至少持续 10 秒（若控制器没有可解析的 `start`，只能用两次样本间已证实的连续时间）；第二次样本的累计下载量至少 4 MiB；下载计数跨样本必须正增长，倒退或保持不变都不算传输进度。没有合格活跃流视为“无退化”，不会探测或清理，因此单个短时、低流量 Web/API 请求不会形成 strike。
 
-只有聚合下载速率低于 `3 MiB/s`，并且对应机场组的 delay 探测失败或高于 1500 ms，才累计一次退化。连续 3 次退化且不在 10 分钟 cooldown 内时，仅逐条删除第二次样本中 chains 包含该机场组的连接，让 Smart 在新连接上重新评估。送中连接使用相同的 2 秒采样、`3 MiB/s` 阈值、1500 ms 探测阈值和连续 3 次要求；健康 delay、没有稳定活跃样本或 inactive 选择都会清零计数。它绝不会调用“清空全部连接”；动作完成或健康结果都会重置连续计数。每次低速/高延迟清理后，送中和白天机场组各自进入默认 10 分钟 cooldown。发生定向清理时才发送 Telegram，正常巡检只写日志；ACTION 文本明确标记 `degraded QoE`。
+每个目标路由只聚合上述合格流。聚合下载速率低于 `3 MiB/s` 时，默认分成两档：低于 `512 KiB/s` 的已确认持续大流可直接累计一次退化，即使 delay 健康也能识别低延迟限速；`512 KiB/s` 至 `3 MiB/s` 的流仍必须同时遇到对应组 delay 探测失败或高于 1500 ms，才累计退化。白天机场链和送中监视器使用同一资格层与分档规则。连续 3 次退化且不在 10 分钟 cooldown 内时，只逐条删除当次通过资格判断的连接 ID，让 Smart 在新连接上重新评估；同一路由上的小 Web/API 连接不会被一起删除。inactive 选择、无合格流、健康的中间档流或高吞吐都会清零计数。它绝不会调用“清空全部连接”；动作完成或健康结果都会重置连续计数。每次定向清理后，送中和白天机场组各自进入默认 10 分钟 cooldown。发生定向清理时才发送 Telegram，正常巡检只写日志；ACTION 文本明确标记 `degraded QoE`。
 
-重要：URL-Test 只提供存活性/RTT fallback，不测量带宽。白天逻辑必须同时满足低吞吐和坏延迟，低吞吐本身不会触发连接清理。
+重要：URL-Test/Smart 的 RTT 不等于可用带宽。只有已经通过年龄、连续性和下载量资格判断的持续大流，才允许在极低吞吐档绕过 delay 条件；短连接和低流量请求即使 delay 很差也不会触发清理。
 
 ### 配置和持久化
 
@@ -163,15 +163,20 @@ export QOE_NIGHT_RECOVERY_PASSES='5'
 export QOE_NIGHT_MIN_HOLD_SECONDS='600'
 export QOE_DAY_SAMPLE_SECONDS='2'
 export QOE_DAY_LOW_RATE_BPS='3145728'
+export QOE_ACTIVE_FLOW_MIN_AGE_SECONDS='10'
+export QOE_ACTIVE_FLOW_MIN_BYTES='4194304'
+export QOE_LOW_RATE_DIRECT_TRIGGER_BPS='524288'
 export QOE_DAY_FAILURE_STRIKES='3'
 export QOE_DAY_COOLDOWN_SECONDS='600'
 ```
+
+`QOE_ACTIVE_FLOW_MIN_AGE_SECONDS` 是第一次样本时要求的最小连接年龄/已证实连续时间；`QOE_ACTIVE_FLOW_MIN_BYTES` 是第二次样本要求的最小累计下载字节数；`QOE_LOW_RATE_DIRECT_TRIGGER_BPS` 是合格持续流不依赖 delay 即可累计 strike 的严格低速阈值。把这些值调低会提高对较短或较小流量的敏感度，也会增加误判风险。现有连续 3 次与 10 分钟 cooldown 保护保持不变。
 
 状态文件为容器内 `/app/state/qoe_watchdog.json`，对应宿主机 `/root/openclash-bot/state/qoe_watchdog.json`。写入使用同目录临时文件、`fsync` 和原子替换；容器重建不会丢失 strike、恢复计数、hold 或 cooldown。文件损坏/缺失及无法识别的旧字段按空状态启动，不会基于未知历史恢复应用选择。watchdog 从不覆盖手工应用选择。宿主脚本还使用 `/tmp/openclash-auto-qoe-watchdog.lock` 的原子 `mkdir` 锁；cron 或手工巡检重叠时，后启动的一次会正常退出且不做任何操作，持锁进程退出时由 trap 清理。
 
 ## 风险
 
-这是有意保守但仍会主动断开连接的自动化：只有稳定样本低于 `3 MiB/s` 且同一 `🔙 送中节点` 探测失败/超过 1500 ms 连续 3 次才清理，清理会造成一次重连和短暂中断。Smart leaf 变化不等待退化阈值，但只删除 chains 明确包含 `🔙 送中节点` 的现有连接；它不会改应用选择器。错误的控制器地址、权限或不完整快照只会跳过本轮。URL-Test/Smart 的延迟不是带宽保证，网络本身持续抖动时仍可能出现重连；可先提高 `QOE_DAY_FAILURE_STRIKES` 或 `QOE_HIGH_DELAY_MS`，或按下方步骤停用 watchdog。
+这是有意保守但仍会主动断开连接的自动化：默认只有至少持续 10 秒、累计下载至少 4 MiB 且跨 2 秒样本稳定的连接才参与吞吐判断；极低于 `512 KiB/s` 的合格持续流可以在健康 delay 下连续 3 次后清理，中间低速档仍要求探测失败/超过 1500 ms。清理会造成一次重连和短暂中断，但只删除对应路由上当次合格的连接，不会改应用选择器。错误的控制器地址、权限、不完整快照或无法确认的连接年龄只会跳过本轮。网络本身持续抖动时仍可能出现重连；可先提高 `QOE_DAY_FAILURE_STRIKES`、`QOE_ACTIVE_FLOW_MIN_AGE_SECONDS` 或 `QOE_ACTIVE_FLOW_MIN_BYTES`，降低 `QOE_LOW_RATE_DIRECT_TRIGGER_BPS`，或按下方步骤停用 watchdog。
 
 ## 验证
 

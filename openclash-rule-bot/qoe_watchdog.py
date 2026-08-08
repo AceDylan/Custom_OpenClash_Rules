@@ -8,6 +8,7 @@ keeps the state machine independently testable and avoids duplicated logic.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 import math
 import os
@@ -67,6 +68,9 @@ class QoEConfig:
     night_min_hold_seconds: int = 10 * 60
     day_sample_seconds: float = 2.0
     day_low_rate_bps: int = 3 * 1024 * 1024
+    active_flow_min_age_seconds: float = 10.0
+    active_flow_min_bytes: int = 4 * 1024 * 1024
+    low_rate_direct_trigger_bps: int = 512 * 1024
     day_failure_strikes: int = 3
     day_cooldown_seconds: int = 10 * 60
 
@@ -95,6 +99,15 @@ class QoEConfig:
                 "QOE_DAY_SAMPLE_SECONDS", cls.day_sample_seconds
             ),
             day_low_rate_bps=_positive_int_env("QOE_DAY_LOW_RATE_BPS", cls.day_low_rate_bps),
+            active_flow_min_age_seconds=_positive_float_env(
+                "QOE_ACTIVE_FLOW_MIN_AGE_SECONDS", cls.active_flow_min_age_seconds
+            ),
+            active_flow_min_bytes=_positive_int_env(
+                "QOE_ACTIVE_FLOW_MIN_BYTES", cls.active_flow_min_bytes
+            ),
+            low_rate_direct_trigger_bps=_positive_int_env(
+                "QOE_LOW_RATE_DIRECT_TRIGGER_BPS", cls.low_rate_direct_trigger_bps
+            ),
             day_failure_strikes=_positive_int_env(
                 "QOE_DAY_FAILURE_STRIKES", cls.day_failure_strikes
             ),
@@ -274,6 +287,125 @@ def stable_download_rate(
         for connection_id in stable_ids
     )
     return delta / max(float(elapsed_seconds), 0.001), set(second_downloads)
+
+
+@dataclass(frozen=True)
+class _ConnectionDownload:
+    downloaded: int
+    raw_start: Any
+    started_at: float | None
+
+
+def _connection_started_at(value: Any) -> float | None:
+    if isinstance(value, bool) or value in (None, ""):
+        return None
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        return numeric if math.isfinite(numeric) and numeric >= 0 else None
+    if not isinstance(value, str):
+        return None
+
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        numeric = float(text)
+    except ValueError:
+        numeric = None
+    if numeric is not None:
+        return numeric if math.isfinite(numeric) and numeric >= 0 else None
+
+    try:
+        parsed = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    timestamp = parsed.timestamp()
+    return timestamp if math.isfinite(timestamp) and timestamp >= 0 else None
+
+
+def _connection_download_details(
+    connections: Sequence[dict[str, Any]],
+    group: str,
+) -> dict[str, _ConnectionDownload]:
+    details: dict[str, _ConnectionDownload] = {}
+    for connection in connections:
+        if not isinstance(connection, dict) or not connection_matches_group(connection, group):
+            continue
+        connection_id = connection.get("id")
+        if connection_id in (None, ""):
+            continue
+        try:
+            downloaded = int(connection.get("download") or 0)
+        except (TypeError, ValueError):
+            downloaded = 0
+        raw_start = connection.get("start")
+        details[str(connection_id)] = _ConnectionDownload(
+            downloaded=max(0, downloaded),
+            raw_start=raw_start,
+            started_at=_connection_started_at(raw_start),
+        )
+    return details
+
+
+def qualified_download_rate(
+    first: Sequence[dict[str, Any]],
+    second: Sequence[dict[str, Any]],
+    group: str,
+    elapsed_seconds: float,
+    sample_finished_at: float,
+    *,
+    min_age_seconds: float,
+    min_download_bytes: int,
+) -> tuple[float | None, set[str]]:
+    """Aggregate only stable, old-enough, sufficiently large route flows."""
+
+    first_details = _connection_download_details(first, group)
+    second_details = _connection_download_details(second, group)
+    elapsed = max(float(elapsed_seconds), 0.001)
+    first_sample_at = float(sample_finished_at) - elapsed
+    qualifying_ids: set[str] = set()
+    delta = 0
+
+    for connection_id in set(first_details).intersection(second_details):
+        earlier = first_details[connection_id]
+        later = second_details[connection_id]
+
+        if later.downloaded <= earlier.downloaded:
+            # A regressed or unchanged counter is not demonstrable transfer
+            # progress (and may be an ID reuse, reset, idle, or keepalive).
+            continue
+        if later.downloaded < min_download_bytes:
+            continue
+
+        if earlier.started_at is not None or later.started_at is not None:
+            if earlier.started_at is None or later.started_at is None:
+                continue
+            if not math.isclose(
+                earlier.started_at,
+                later.started_at,
+                rel_tol=0.0,
+                abs_tol=0.001,
+            ):
+                continue
+            observed_age = first_sample_at - earlier.started_at
+        else:
+            if earlier.raw_start != later.raw_start:
+                continue
+            # Without a usable start timestamp, the only age we can prove from
+            # the snapshots is continuity across the sampling interval itself.
+            observed_age = elapsed
+
+        if observed_age < min_age_seconds:
+            continue
+
+        qualifying_ids.add(connection_id)
+        delta += later.downloaded - earlier.downloaded
+
+    if not qualifying_ids:
+        return None, set()
+    return delta / elapsed, qualifying_ids
 
 
 class QoEWatchdog:
@@ -544,25 +676,33 @@ class QoEWatchdog:
         deleted_ids: set[str] = set()
         for airport_group in sorted(active_airports):
             group_state = self._day_group_state(group_states, airport_group)
-            rate_bps, second_ids = stable_download_rate(
+            rate_bps, qualifying_ids = qualified_download_rate(
                 first,
                 second,
                 airport_group,
                 elapsed,
+                float(self.wall_clock()),
+                min_age_seconds=self.config.active_flow_min_age_seconds,
+                min_download_bytes=self.config.active_flow_min_bytes,
             )
             if rate_bps is None:
                 group_state["degraded_count"] = 0
-                result["notes"].append(f"{airport_group}: no stable active samples")
+                result["notes"].append(f"{airport_group}: no qualified active flows")
                 continue
 
             if rate_bps >= self.config.day_low_rate_bps:
                 group_state["degraded_count"] = 0
                 continue
 
-            delay = self._probe(airport_group)
-            if not self._delay_is_bad(delay):
-                group_state["degraded_count"] = 0
-                continue
+            direct_threshold = min(
+                self.config.low_rate_direct_trigger_bps,
+                self.config.day_low_rate_bps,
+            )
+            if rate_bps >= direct_threshold:
+                delay = self._probe(airport_group)
+                if not self._delay_is_bad(delay):
+                    group_state["degraded_count"] = 0
+                    continue
 
             degraded_count = int(group_state.get("degraded_count") or 0) + 1
             group_state["degraded_count"] = degraded_count
@@ -579,7 +719,7 @@ class QoEWatchdog:
 
             cleared = 0
             failed = 0
-            for connection_id in sorted(second_ids - deleted_ids):
+            for connection_id in sorted(qualifying_ids - deleted_ids):
                 try:
                     succeeded = bool(self.controller.delete_connection(connection_id))
                 except Exception:
@@ -686,24 +826,32 @@ class QoEWatchdog:
             return
 
         first, second, elapsed = samples
-        rate_bps, second_ids = stable_download_rate(
+        rate_bps, qualifying_ids = qualified_download_rate(
             first,
             second,
             SEND_TO_CHINA_NODE,
             elapsed,
+            float(self.wall_clock()),
+            min_age_seconds=self.config.active_flow_min_age_seconds,
+            min_download_bytes=self.config.active_flow_min_bytes,
         )
         if rate_bps is None:
             send_state["degraded_count"] = 0
-            result["notes"].append(f"{SEND_TO_CHINA_NODE}: no stable active samples")
+            result["notes"].append(f"{SEND_TO_CHINA_NODE}: no qualified active flows")
             return
         if rate_bps >= self.config.day_low_rate_bps:
             send_state["degraded_count"] = 0
             return
 
-        delay = self._probe(SEND_TO_CHINA_NODE)
-        if not self._delay_is_bad(delay):
-            send_state["degraded_count"] = 0
-            return
+        direct_threshold = min(
+            self.config.low_rate_direct_trigger_bps,
+            self.config.day_low_rate_bps,
+        )
+        if rate_bps >= direct_threshold:
+            delay = self._probe(SEND_TO_CHINA_NODE)
+            if not self._delay_is_bad(delay):
+                send_state["degraded_count"] = 0
+                return
 
         degraded_count = int(send_state.get("degraded_count") or 0) + 1
         send_state["degraded_count"] = degraded_count
@@ -719,7 +867,7 @@ class QoEWatchdog:
             result["notes"].append("send-to-China selector changed during sampling")
             return
 
-        cleared, failed = self._delete_matching_connections(second_ids)
+        cleared, failed = self._delete_matching_connections(qualifying_ids)
         send_state["degraded_count"] = 0
         if cleared:
             send_state["last_degraded_action_at"] = now
