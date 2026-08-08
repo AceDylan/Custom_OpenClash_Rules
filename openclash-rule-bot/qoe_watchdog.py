@@ -143,6 +143,13 @@ def load_state(path: str | os.PathLike[str]) -> dict[str, Any]:
             state["night"]["failures"] = night["failures"]
         if isinstance(night.get("failovers"), dict):
             state["night"]["failovers"] = night["failovers"]
+        for records in state["night"].values():
+            for record in records.values():
+                if isinstance(record, dict) and "probe_group" not in record:
+                    smart_group = record.get("smart_group")
+                    if isinstance(smart_group, str) and smart_group:
+                        record["probe_group"] = smart_group
+                        record.pop("vps_node", None)
     day = loaded.get("day")
     if isinstance(day, dict) and isinstance(day.get("groups"), dict):
         state["day"]["groups"] = day["groups"]
@@ -345,12 +352,6 @@ class QoEWatchdog:
     def _delay_is_bad(self, delay: float | None) -> bool:
         return delay is None or delay > self.config.high_delay_ms
 
-    def _resolve_current_node(self, smart_group: str) -> str | None:
-        fallback_option = self._current_option(smart_group)
-        if not fallback_option:
-            return None
-        return self._current_option(fallback_option)
-
     def _set_if_still_current(self, group: str, expected: str, target: str) -> bool:
         latest = self._get_proxy(group)
         if not latest or latest.get("now") != expected:
@@ -379,7 +380,7 @@ class QoEWatchdog:
             if isinstance(record, dict):
                 airport_group = record.get("airport_group")
                 smart_group = record.get("smart_group")
-                vps_node = record.get("vps_node")
+                probe_group = record.get("probe_group")
 
                 # A selector that no longer points to the exact watchdog target
                 # was changed by a user or another automation. Forget the record
@@ -390,11 +391,17 @@ class QoEWatchdog:
                     result["notes"].append(f"{application}: manual selection preserved")
                     continue
 
-                if not all(isinstance(value, str) and value for value in (smart_group, vps_node)):
+                if (
+                    not all(
+                        isinstance(value, str) and value
+                        for value in (smart_group, probe_group)
+                    )
+                    or probe_group != smart_group
+                ):
                     failovers.pop(application, None)
                     continue
 
-                delay = self._probe(vps_node)
+                delay = self._probe(probe_group)
                 if self._delay_is_bad(delay):
                     record["healthy_count"] = 0
                     continue
@@ -424,13 +431,8 @@ class QoEWatchdog:
 
             smart_group = current
             airport_group = SMART_TO_AIRPORT[smart_group]
-            vps_node = self._resolve_current_node(smart_group)
-            if not vps_node:
-                failures.pop(application, None)
-                result["notes"].append(f"{application}: VPS node unresolved")
-                continue
-
-            delay = self._probe(vps_node)
+            probe_group = smart_group
+            delay = self._probe(probe_group)
             if not self._delay_is_bad(delay):
                 failures.pop(application, None)
                 continue
@@ -439,12 +441,12 @@ class QoEWatchdog:
             same_probe_target = (
                 isinstance(previous, dict)
                 and previous.get("smart_group") == smart_group
-                and previous.get("vps_node") == vps_node
+                and previous.get("probe_group") == probe_group
             )
             failure_count = int(previous.get("count") or 0) + 1 if same_probe_target else 1
             failures[application] = {
                 "smart_group": smart_group,
-                "vps_node": vps_node,
+                "probe_group": probe_group,
                 "count": failure_count,
             }
             if failure_count < self.config.night_failure_strikes:
@@ -454,7 +456,7 @@ class QoEWatchdog:
                 failovers[application] = {
                     "smart_group": smart_group,
                     "airport_group": airport_group,
-                    "vps_node": vps_node,
+                    "probe_group": probe_group,
                     "failed_over_at": now,
                     "healthy_count": 0,
                 }

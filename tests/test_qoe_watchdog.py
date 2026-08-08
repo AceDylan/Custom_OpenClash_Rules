@@ -25,7 +25,7 @@ APP = "💬 社交媒体"
 SMART = "🇺🇸 美国智能"
 AIRPORT = "🇺🇸 美国节点"
 MANUAL = "🇺🇸 美国手选"
-VPS = "BEST | 美国 VPS"
+UNADDRESSABLE_BEST = "BEST | 美国 VPS"
 CHAIN = "🔗 链式美国"
 FRONT = "✈️ 机场前置"
 
@@ -80,7 +80,7 @@ def night_groups():
     return {
         APP: {"now": SMART, "all": [SMART, AIRPORT]},
         SMART: {"now": MANUAL, "all": [MANUAL, AIRPORT]},
-        MANUAL: {"now": VPS, "all": [VPS]},
+        MANUAL: {"now": UNADDRESSABLE_BEST, "all": [UNADDRESSABLE_BEST]},
     }
 
 
@@ -133,7 +133,7 @@ class QoEWatchdogTests(unittest.TestCase):
         self.assertEqual(expected_chains, CHAIN_TO_AIRPORT)
 
     def test_night_failover_requires_three_consecutive_bad_probes(self):
-        controller = FakeController(night_groups(), delays={VPS: None})
+        controller = FakeController(night_groups(), delays={SMART: None})
         watchdog = self.watchdog(controller)
 
         watchdog.run_once()
@@ -143,18 +143,30 @@ class QoEWatchdogTests(unittest.TestCase):
         result = watchdog.run_once()
         self.assertEqual([(APP, AIRPORT)], controller.selections)
         self.assertEqual("night", result["mode"])
-        self.assertTrue(all(probe[0] == VPS for probe in controller.probes))
+        self.assertTrue(all(probe[0] == SMART for probe in controller.probes))
         state = load_state(self.state_path)
-        self.assertEqual(VPS, state["night"]["failovers"][APP]["vps_node"])
+        self.assertEqual(SMART, state["night"]["failovers"][APP]["probe_group"])
+
+    def test_night_healthy_smart_group_ignores_unaddressable_best_leaf(self):
+        controller = FakeController(night_groups(), delays={SMART: 100})
+        watchdog = self.watchdog(controller)
+
+        for _ in range(3):
+            watchdog.run_once()
+
+        self.assertEqual([], controller.selections)
+        self.assertEqual([SMART, SMART, SMART], [probe[0] for probe in controller.probes])
+        self.assertNotIn(UNADDRESSABLE_BEST, [probe[0] for probe in controller.probes])
+        self.assertNotIn(APP, load_state(self.state_path)["night"]["failures"])
 
     def test_night_recovery_requires_five_healthy_probes_and_hold_time(self):
-        controller = FakeController(night_groups(), delays={VPS: 2_000})
+        controller = FakeController(night_groups(), delays={SMART: 2_000})
         watchdog = self.watchdog(controller)
         for _ in range(3):
             watchdog.run_once()
         self.assertEqual(AIRPORT, controller.groups[APP]["now"])
 
-        controller.delays[VPS] = 100
+        controller.delays[SMART] = 100
         for now in (1_100, 1_200, 1_300, 1_400):
             self.wall.value = now
             watchdog.run_once()
@@ -166,14 +178,89 @@ class QoEWatchdogTests(unittest.TestCase):
         self.assertEqual((APP, SMART), controller.selections[-1])
         self.assertNotIn(APP, load_state(self.state_path)["night"]["failovers"])
 
+    def test_legacy_active_failover_migrates_and_keeps_recovery_progress(self):
+        groups = night_groups()
+        groups[APP]["now"] = AIRPORT
+        controller = FakeController(groups, delays={SMART: 100})
+        atomic_write_json(
+            self.state_path,
+            {
+                "version": 1,
+                "night": {
+                    "failures": {},
+                    "failovers": {
+                        APP: {
+                            "smart_group": SMART,
+                            "airport_group": AIRPORT,
+                            "vps_node": UNADDRESSABLE_BEST,
+                            "failed_over_at": 1_000,
+                            "healthy_count": 2,
+                        }
+                    },
+                },
+                "day": {"groups": {}},
+            },
+        )
+        watchdog = self.watchdog(controller)
+
+        self.wall.value = 1_100
+        watchdog.run_once()
+        migrated = load_state(self.state_path)["night"]["failovers"][APP]
+        self.assertEqual(SMART, migrated["probe_group"])
+        self.assertNotIn("vps_node", migrated)
+        self.assertEqual(3, migrated["healthy_count"])
+        self.assertEqual(1_000, migrated["failed_over_at"])
+        self.assertEqual(AIRPORT, controller.groups[APP]["now"])
+
+        self.wall.value = 1_200
+        watchdog.run_once()
+        self.assertEqual(AIRPORT, controller.groups[APP]["now"])
+
+        self.wall.value = 1_600
+        watchdog.run_once()
+        self.assertEqual(SMART, controller.groups[APP]["now"])
+        self.assertEqual((APP, SMART), controller.selections[-1])
+        self.assertNotIn(APP, load_state(self.state_path)["night"]["failovers"])
+        self.assertEqual([SMART, SMART, SMART], [probe[0] for probe in controller.probes])
+        self.assertNotIn(UNADDRESSABLE_BEST, [probe[0] for probe in controller.probes])
+
+    def test_legacy_failure_migrates_and_keeps_strike_progress(self):
+        controller = FakeController(night_groups(), delays={SMART: None})
+        atomic_write_json(
+            self.state_path,
+            {
+                "version": 1,
+                "night": {
+                    "failures": {
+                        APP: {
+                            "smart_group": SMART,
+                            "vps_node": UNADDRESSABLE_BEST,
+                            "count": 2,
+                        }
+                    },
+                    "failovers": {},
+                },
+                "day": {"groups": {}},
+            },
+        )
+
+        self.watchdog(controller).run_once()
+
+        self.assertEqual([(APP, AIRPORT)], controller.selections)
+        record = load_state(self.state_path)["night"]["failovers"][APP]
+        self.assertEqual(SMART, record["probe_group"])
+        self.assertNotIn("vps_node", record)
+        self.assertEqual([SMART], [probe[0] for probe in controller.probes])
+        self.assertNotIn(UNADDRESSABLE_BEST, [probe[0] for probe in controller.probes])
+
     def test_recorded_failover_never_overrides_a_manual_selection(self):
-        controller = FakeController(night_groups(), delays={VPS: None})
+        controller = FakeController(night_groups(), delays={SMART: None})
         watchdog = self.watchdog(controller)
         for _ in range(3):
             watchdog.run_once()
 
         controller.groups[APP]["now"] = "🎯 全球直连"
-        controller.delays[VPS] = 100
+        controller.delays[SMART] = 100
         selections_before = list(controller.selections)
         watchdog.run_once()
 
@@ -181,7 +268,7 @@ class QoEWatchdogTests(unittest.TestCase):
         self.assertNotIn(APP, load_state(self.state_path)["night"]["failovers"])
 
     def test_incomplete_application_snapshot_makes_no_mutation_and_breaks_strikes(self):
-        controller = FakeController(night_groups(), delays={VPS: None})
+        controller = FakeController(night_groups(), delays={SMART: None})
         watchdog = self.watchdog(controller)
         watchdog.run_once()
         watchdog.run_once()

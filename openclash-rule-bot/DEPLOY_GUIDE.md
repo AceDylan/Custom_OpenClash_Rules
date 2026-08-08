@@ -132,9 +132,9 @@ chmod +x setup.sh
 日本智能 ↔ 日本节点
 ```
 
-应用当前选择 `*智能` 时，watchdog 依次解析 fallback 当前选项和该 selector 当前节点，最终通过控制器 `/proxies/{具体节点}/delay` 探测实际 VPS。探测失败或延迟高于 1500 ms 连续 3 次，才把该应用临时切换到对应 `*节点`。
+应用当前选择 `*智能` 时，watchdog 直接通过控制器 `/proxies/{智能组}/delay` 探测地区智能 fallback 组。这样既测试实际的 VPS 优先路径，也由 fallback 自身在 VPS 硬故障时尝试后备节点；不会再把手选 selector 返回的 BEST 叶子名称当作可寻址的 `/proxies` 资源。智能组探测失败或延迟高于 1500 ms 连续 3 次，才把该应用临时切换到对应 `*节点`。
 
-failover 会记录原始具体 VPS 节点。只有该记录仍存在且应用仍保持 watchdog 设置的 `*节点` 时才允许恢复；任何人工选择都会使记录失效，watchdog 不会覆盖。恢复要求原 VPS 连续 5 次健康，并且 failover 至少保持 10 分钟。
+failover 会在 `probe_group` 字段记录被探测的原始智能组。只有该记录仍存在且应用仍保持 watchdog 设置的 `*节点` 时才允许恢复；任何人工选择都会使记录失效，watchdog 不会覆盖。恢复要求原智能组连续 5 次健康，并且 failover 至少保持 10 分钟。
 
 ### 白天机场→VPS 链式模式
 
