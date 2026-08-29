@@ -150,3 +150,6 @@ DOMAIN-SUFFIX,fonts.googleapis.com
 # 添加域名 hostv6.acedylan.us
 DOMAIN-SUFFIX,hostv6.acedylan.us
 
+
+# 添加域名 emby666.com
+DOMAIN-SUFFIX,emby666.com
