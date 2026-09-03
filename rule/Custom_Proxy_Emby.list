@@ -28,10 +28,6 @@ DOMAIN-SUFFIX,oceancloud.asia
 # 蘑菇
 DOMAIN-SUFFIX,vban.xyz
 
-
-# 添加域名 apro.alphatvapp.top
-DOMAIN-SUFFIX,apro.alphatvapp.top
-
 # 添加域名 sub.joinmaosu.top
 DOMAIN-SUFFIX,sub.joinmaosu.top
 
@@ -39,8 +35,6 @@ DOMAIN-SUFFIX,sub.joinmaosu.top
 # 添加域名 rss.ccgfw.top
 DOMAIN-SUFFIX,rss.ccgfw.top
 
-# 添加域名 tannel.asia
-DOMAIN-SUFFIX,tannel.asia
 
 # 添加域名 book.alphatvapp.top
 DOMAIN-SUFFIX,book.alphatvapp.top
