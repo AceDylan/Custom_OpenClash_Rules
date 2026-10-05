@@ -51,3 +51,6 @@ DOMAIN-SUFFIX,host.acedylan.us
 
 # 添加域名 oauth2.googleapis.com
 DOMAIN-SUFFIX,oauth2.googleapis.com
+
+# 添加域名 ql.app
+DOMAIN-SUFFIX,ql.app
