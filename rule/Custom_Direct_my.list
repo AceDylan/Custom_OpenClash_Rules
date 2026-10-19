@@ -154,3 +154,6 @@ DOMAIN-SUFFIX,hostv6.acedylan.us
 
 # 添加域名 a111.sbs
 DOMAIN-SUFFIX,a111.sbs
+
+# 添加域名 2.emby.men
+DOMAIN-SUFFIX,2.emby.men
