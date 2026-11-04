@@ -154,3 +154,6 @@ DOMAIN-SUFFIX,hostv6.acedylan.us
 
 # 添加域名 ybpay.vansys.cc
 DOMAIN-SUFFIX,ybpay.vansys.cc
+
+# 添加域名 best.acedylan.us
+DOMAIN-SUFFIX,best.acedylan.us
