@@ -54,3 +54,6 @@ DOMAIN-SUFFIX,oauth2.googleapis.com
 
 # 添加域名 ql.app
 DOMAIN-SUFFIX,ql.app
+
+# 添加域名 anyrouter.top
+DOMAIN-SUFFIX,anyrouter.top
